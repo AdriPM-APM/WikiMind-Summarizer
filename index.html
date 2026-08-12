@@ -247,63 +247,98 @@
   // ============================================================
   //  LOCAL SUMMARIZER ENGINE (TF-IDF)
   // ============================================================
-  function localSummarize(text, targetLang, maxSentences = 5) {
-    log('Ejecutando motor de resumen local...');
-    const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 20);
-    if (sentences.length === 0) return '<p>No hay suficientes oraciones para procesar.</p>';
+function localSummarize(text, targetLang, maxSentences = 5) {
+  log('Ejecutando motor de resumen local...');
+  
+  // Protege puntos en abreviaturas comunes antes de separar oraciones
+  const cleanText = text
+    .replace(/\b(EE\.UU|S\.A|Dr|Pág|Vol|Art|vs)\./gi, '$1_DOT_');
 
-    const stopwords = new Set([
-      'el','la','los','las','un','una','unos','unas','de','del','en','y','a','que','por','para','con','sin','sobre',
-      'entre','tras','durante','mediante','según','hasta','desde','cuando','donde','mientras','aunque','porque','como',
-      'cual','cuyo','quien','cuanto','muy','más','menos','tan','tanto','ni','o','u','sino','si','no','ya','bien'
-    ]);
+  const sentences = cleanText
+    .split(/[.!?]+/)
+    .map(s => s.replace(/_DOT_/g, '.').trim())
+    .filter(s => s.length > 20);
 
-    const wordFreq = {};
-    sentences.forEach(s => {
-      const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
-      words.forEach(w => wordFreq[w] = (wordFreq[w] || 0) + 1);
-    });
+  if (sentences.length === 0) return '<p>No hay suficientes oraciones para procesar.</p>';
 
-    const scored = sentences.map((s, idx) => {
-      const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
-      let score = words.reduce((sum, w) => sum + (wordFreq[w] || 0), 0);
-      const posBonus = 1 + (1 - idx / sentences.length) * 0.5;
-      const lenBonus = Math.min(1.5, 0.5 + (s.length / 200));
-      score *= posBonus * lenBonus;
-      return { sentence: s, score };
-    });
+  const stopwords = new Set([
+    'el','la','los','las','un','una','unos','unas','de','del','en','y','a','que','por','para','con','sin','sobre',
+    'entre','tras','durante','mediante','según','hasta','desde','cuando','donde','mientras','aunque','porque','como',
+    'cual','cuyo','quien','cuanto','muy','más','menos','tan','tanto','ni','o','u','sino','si','no','ya','bien'
+  ]);
 
-    scored.sort((a,b) => b.score - a.score);
-    const top = scored.slice(0, maxSentences).map(item => item.sentence);
-    const ordered = sentences.filter(s => top.includes(s));
+  const wordFreq = {};
+  sentences.forEach(s => {
+    const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
+    words.forEach(w => wordFreq[w] = (wordFreq[w] || 0) + 1);
+  });
 
-    const summary = ordered.map(s => `<p>${escapeHTML(s)}.</p>`).join('');
-    return `<div class="badge">🧠 Resumen Local (${targetLang.toUpperCase()})</div>${summary}`;
-  }
+  const scored = sentences.map((s, idx) => {
+    const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
+    let score = words.reduce((sum, w) => sum + (wordFreq[w] || 0), 0);
+    const posBonus = 1 + (1 - idx / sentences.length) * 0.5;
+    const lenBonus = Math.min(1.5, 0.5 + (s.length / 200));
+    score *= posBonus * lenBonus;
+    return { sentence: s, score };
+  });
+
+  scored.sort((a,b) => b.score - a.score);
+  const top = scored.slice(0, maxSentences).map(item => item.sentence);
+  const ordered = sentences.filter(s => top.includes(s));
+
+  const summary = ordered.map(s => `<p>${escapeHTML(s)}.</p>`).join('');
+  return `<div class="badge">🧠 Resumen Local (${targetLang.toUpperCase()})</div>${summa
+                                                                                  ry}`;
+}
 
   // ============================================================
   //  AI PROXY SUMMARIZER
   // ============================================================
   async function aiSummarize(text, sourceLang, targetLang) {
-    log('Enviando consulta a la API de IA...');
-    const prompt = `Resume el siguiente artículo de Wikipedia en ${targetLang.toUpperCase()}. Usa **negrita** para conceptos clave. Máximo 3 párrafos.\n\nTexto (${sourceLang.toUpperCase()}):\n${text.slice(0, 4000)}`;
+  log('Enviando consulta a la API de IA...');
+  const prompt = `Resume el siguiente artículo de Wikipedia en ${targetLang.toUpperCase()}. Usa **negrita** para conceptos clave. Máximo 3 párrafos.\n\nTexto (${sourceLang.toUpperCase()}):\n${text.slice(0, 4000)}`;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000); // Timeout de 12s
+
+  try {
     const response = await fetch('/api/proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
-        model: 'google/gemma-4-31b-it:free',
+        // Cambiado a modelo válido/estable en plataformas OpenRouter/Proxy
+        model: 'google/gemma-2-9b-it:free', 
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
         max_tokens: 500
       })
     });
 
-    if (!response.ok) throw new Error(`Proxy HTTP error: status ${response.status}`);
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errDetails = `Status ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errDetails += ` - ${errorData.error?.message || JSON.stringify(errorData)}`;
+      } catch (_) {
+        errDetails += ` (${response.statusText})`;
+      }
+      throw new Error(`Proxy HTTP Error: ${errDetails}`);
+    }
+
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
-    if (!content || content.length < 10) throw new Error('Respuesta de IA vacía.');
+    if (!content || content.trim().length < 10) throw new Error('Respuesta de IA vacía o incompleta.');
+    
     return content;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') throw new Error('Timeout en la API de IA (12s superados).');
+    throw err;
+
+  }
   }
 
   // ============================================================
