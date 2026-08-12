@@ -247,98 +247,121 @@
   // ============================================================
   //  LOCAL SUMMARIZER ENGINE (TF-IDF)
   // ============================================================
-function localSummarize(text, targetLang, maxSentences = 5) {
-  log('Ejecutando motor de resumen local...');
-  
-  // Protege puntos en abreviaturas comunes antes de separar oraciones
-  const cleanText = text
-    .replace(/\b(EE\.UU|S\.A|Dr|Pág|Vol|Art|vs)\./gi, '$1_DOT_');
+  function localSummarize(text, targetLang, maxSentences = 5) {
+    log('Ejecutando motor de resumen local...');
+    
+    // Proteger abreviaturas para evitar tokenización errónea de oraciones
+    const cleanText = text.replace(/\b(EE\.UU|S\.A|Dr|Pág|Vol|Art|vs)\./gi, '$1_DOT_');
+    const sentences = cleanText
+      .split(/[.!?]+/)
+      .map(s => s.replace(/_DOT_/g, '.').trim())
+      .filter(s => s.length > 20);
 
-  const sentences = cleanText
-    .split(/[.!?]+/)
-    .map(s => s.replace(/_DOT_/g, '.').trim())
-    .filter(s => s.length > 20);
+    if (sentences.length === 0) return '<p>No hay suficientes oraciones para procesar.</p>';
 
-  if (sentences.length === 0) return '<p>No hay suficientes oraciones para procesar.</p>';
+    const stopwords = new Set([
+      'el','la','los','las','un','una','unos','unas','de','del','en','y','a','que','por','para','con','sin','sobre',
+      'entre','tras','durante','mediante','según','hasta','desde','cuando','donde','mientras','aunque','porque','como',
+      'cual','cuyo','quien','cuanto','muy','más','menos','tan','tanto','ni','o','u','sino','si','no','ya','bien'
+    ]);
 
-  const stopwords = new Set([
-    'el','la','los','las','un','una','unos','unas','de','del','en','y','a','que','por','para','con','sin','sobre',
-    'entre','tras','durante','mediante','según','hasta','desde','cuando','donde','mientras','aunque','porque','como',
-    'cual','cuyo','quien','cuanto','muy','más','menos','tan','tanto','ni','o','u','sino','si','no','ya','bien'
-  ]);
+    const wordFreq = {};
+    sentences.forEach(s => {
+      const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
+      words.forEach(w => wordFreq[w] = (wordFreq[w] || 0) + 1);
+    });
 
-  const wordFreq = {};
-  sentences.forEach(s => {
-    const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
-    words.forEach(w => wordFreq[w] = (wordFreq[w] || 0) + 1);
-  });
+    const scored = sentences.map((s, idx) => {
+      const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
+      let score = words.reduce((sum, w) => sum + (wordFreq[w] || 0), 0);
+      const posBonus = 1 + (1 - idx / sentences.length) * 0.5;
+      const lenBonus = Math.min(1.5, 0.5 + (s.length / 200));
+      score *= posBonus * lenBonus;
+      return { sentence: s, score };
+    });
 
-  const scored = sentences.map((s, idx) => {
-    const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
-    let score = words.reduce((sum, w) => sum + (wordFreq[w] || 0), 0);
-    const posBonus = 1 + (1 - idx / sentences.length) * 0.5;
-    const lenBonus = Math.min(1.5, 0.5 + (s.length / 200));
-    score *= posBonus * lenBonus;
-    return { sentence: s, score };
-  });
+    scored.sort((a,b) => b.score - a.score);
+    const top = scored.slice(0, maxSentences).map(item => item.sentence);
+    const ordered = sentences.filter(s => top.includes(s));
 
-  scored.sort((a,b) => b.score - a.score);
-  const top = scored.slice(0, maxSentences).map(item => item.sentence);
-  const ordered = sentences.filter(s => top.includes(s));
-
-  const summary = ordered.map(s => `<p>${escapeHTML(s)}.</p>`).join('');
-  return `<div class="badge">🧠 Resumen Local (${targetLang.toUpperCase()})</div>${summa
-                                                                                  ry}`;
-}
+    const summary = ordered.map(s => `<p>${escapeHTML(s)}.</p>`).join('');
+    return `<div class="badge">🧠 Resumen Local (${targetLang.toUpperCase()})</div>${summary}`;
+  }
 
   // ============================================================
   //  AI PROXY SUMMARIZER
   // ============================================================
   async function aiSummarize(text, sourceLang, targetLang) {
-  log('Enviando consulta a la API de IA...');
-  const prompt = `Resume el siguiente artículo de Wikipedia en ${targetLang.toUpperCase()}. Usa **negrita** para conceptos clave. Máximo 3 párrafos.\n\nTexto (${sourceLang.toUpperCase()}):\n${text.slice(0, 4000)}`;
+    log('Enviando consulta a la API de IA...');
+    const prompt = `Resume el siguiente artículo de Wikipedia en ${targetLang.toUpperCase()}. Usa **negrita** para conceptos clave. Máximo 3 párrafos.\n\nTexto (${sourceLang.toUpperCase()}):\n${text.slice(0, 4000)}`;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000); // Timeout de 12s
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s Timeout
 
-  try {
-    const response = await fetch('/api/proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        // Cambiado a modelo válido/estable en plataformas OpenRouter/Proxy
-        model: 'google/gemma-2-9b-it:free', 
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-        max_tokens: 500
-      })
-    });
+    try {
+      const response = await fetch('/api/proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: 'google/gemma-2-9b-it:free', // Endpoint activo y funcional
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.7,
+          max_tokens: 500
+        })
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      let errDetails = `Status ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errDetails += ` - ${errorData.error?.message || JSON.stringify(errorData)}`;
-      } catch (_) {
-        errDetails += ` (${response.statusText})`;
+      if (!response.ok) {
+        let errDetails = `Status ${response.status}`;
+        try {
+          const errData = await response.json();
+          if (errData.error?.message) errDetails += `: ${errData.error.message}`;
+        } catch (_) {}
+        throw new Error(`Proxy HTTP error: ${errDetails}`);
       }
-      throw new Error(`Proxy HTTP Error: ${errDetails}`);
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content || content.trim().length < 10) throw new Error('Respuesta de IA vacía.');
+      return content;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') throw new Error('Timeout al conectar con la API de IA (12s).');
+      throw err;
+    }
+  }
+
+  // ============================================================
+  //  MEDIAWIKI API FETCH ENGINE
+  // ============================================================
+  async function fetchWikiPage(query, lang) {
+    // 1. Intento por título exacto
+    const directUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&redirects=1&titles=${encodeURIComponent(query)}&format=json&formatversion=2&origin=*`;
+    const res = await fetch(directUrl);
+    if (!res.ok) throw new Error(`Error de conexión con Wikipedia (HTTP ${res.status})`);
+    
+    const data = await res.json();
+    let page = data.query?.pages?.[0];
+
+    // 2. Fallback: Si no hay título exacto, usar motor de búsqueda (generator=search)
+    if (!page || page.missing) {
+      log(`Sin coincidencia exacta para "${query}". Ejecutando Búsqueda Difusa...`);
+      const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&redirects=1&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=1&format=json&formatversion=2&origin=*`;
+      
+      const searchRes = await fetch(searchUrl);
+      if (!searchRes.ok) throw new Error(`Error en búsqueda difusa de Wikipedia (HTTP ${searchRes.status})`);
+      
+      const searchData = await searchRes.json();
+      page = searchData.query?.pages?.[0];
     }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content || content.trim().length < 10) throw new Error('Respuesta de IA vacía o incompleta.');
-    
-    return content;
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') throw new Error('Timeout en la API de IA (12s superados).');
-    throw err;
+    if (!page || page.missing) {
+      throw new Error(`No se encontró ningún artículo relacionado con "${query}" en Wikipedia (${lang.toUpperCase()}).`);
+    }
 
-  }
+    return page;
   }
 
   // ============================================================
@@ -361,18 +384,8 @@ function localSummarize(text, targetLang, maxSentences = 5) {
     showLoading();
 
     try {
-      // Standardized MediaWiki API Request (formatversion=2 & redirects=1 resolve structural issues)
-      const wikiUrl = `https://${sourceLang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&redirects=1&titles=${encodeURIComponent(query)}&format=json&formatversion=2&origin=*`;
-      
-      const wikiRes = await fetch(wikiUrl);
-      if (!wikiRes.ok) throw new Error(`Error de conexión con Wikipedia (HTTP ${wikiRes.status})`);
+      const page = await fetchWikiPage(query, sourceLang);
 
-      const wikiData = await wikiRes.json();
-      const page = wikiData.query?.pages?.[0];
-
-      if (!page || page.missing) {
-        throw new Error(`No se encontró el artículo "${query}" en Wikipedia (${sourceLang.toUpperCase()}).`);
-      }
       if (!page.extract || page.extract.trim() === '') {
         throw new Error('El artículo no contiene texto suficiente para procesar.');
       }
@@ -400,7 +413,7 @@ function localSummarize(text, targetLang, maxSentences = 5) {
           log(`Fallo de IA: ${aiErr.message}. Redirigiendo a modo Local.`);
           const fallback = localSummarize(extract, targetLang);
           resultHtml = `
-            <div class="badge" style="background:#f9e0d0;color:#7a3a1a;">⚠️ Servidor IA no disponible. Mostrando resumen local:</div>
+            <div class="badge" style="background:#f9e0d0;color:#7a3a1a;">⚠️ Servidor IA no disponible (${escapeHTML(aiErr.message)}). Mostrando resumen local:</div>
             ${fallback}
           `;
         }
@@ -416,7 +429,7 @@ function localSummarize(text, targetLang, maxSentences = 5) {
   }
 
   // ============================================================
-  //  SAFE AD INITIALIZATION (Prevents document.write crashes)
+  //  SAFE AD INITIALIZATION
   // ============================================================
   function loadAdsSafely() {
     try {
@@ -430,7 +443,6 @@ function localSummarize(text, targetLang, maxSentences = 5) {
 
       wrapper.classList.add('active');
       
-      // Override document.write while ad scripts load to prevent DOM erasure
       const originalWrite = document.write;
       document.write = function(str) {
         const tempDiv = document.createElement('div');
@@ -454,14 +466,12 @@ function localSummarize(text, targetLang, maxSentences = 5) {
   //  EVENT BINDINGS & INITIALIZATION
   // ============================================================
   function init() {
-    // 1. Bind search triggers immediately
     searchBtn.addEventListener('click', executeSearch);
     
     searchInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') executeSearch();
     });
 
-    // 2. Theme toggle binding
     document.getElementById('theme-toggle-btn').addEventListener('click', () => {
       document.body.classList.toggle('dark-mode');
     });
@@ -470,7 +480,6 @@ function localSummarize(text, targetLang, maxSentences = 5) {
       document.body.classList.add('dark-mode');
     }
 
-    // 3. Autocomplete / OpenSearch handler
     let debounceTimer;
     searchInput.addEventListener('input', function() {
       clearTimeout(debounceTimer);
@@ -522,23 +531,22 @@ function localSummarize(text, targetLang, maxSentences = 5) {
       }
     });
 
-    // 4. Ad settings listener
     document.getElementById('hide-ads')?.addEventListener('change', function() {
       Storage.set('hideAds', String(this.checked));
       location.reload();
     });
 
-    // 5. Load external scripts non-blockingly
     loadAdsSafely();
     log('WikiMind inicializado correctamente.');
   }
 
-  // Ensure DOM is fully loaded before executing setup
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
 </script>
+  
 </body>
 </html>
+
