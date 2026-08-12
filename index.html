@@ -169,8 +169,8 @@
 
   <div class="mode-selector">
     <label><input type="radio" name="summary-mode" value="extract" checked /> 📄 Extracto</label>
-    <label><input type="radio" name="summary-mode" value="local" /> 🧠 Local (TF-IDF)</label>
-    <label><input type="radio" name="summary-mode" value="ai" /> 🤖 IA (OpenRouter)</label>
+    <label><input type="radio" name="summary-mode" value="local" /> 🧠 Local</label>
+    <label><input type="radio" name="summary-mode" value="ai" /> 🤖 IA</label>
   </div>
 
   <div class="settings">
@@ -227,8 +227,10 @@
   };
 
   // ============================================================
-  //  ANUNCIOS
+  //  ANUNCIOS (recarga solo si es necesario)
   // ============================================================
+  let adsLoaded = false;
+
   function loadAds() {
     const hideAds = Storage.get('hideAds') !== 'false';
     const checkbox = document.getElementById('hide-ads');
@@ -236,6 +238,7 @@
     const wrapper = document.getElementById('ad-wrapper');
 
     function activate() {
+      if (adsLoaded) return; // evitar duplicados
       wrapper.classList.add('active');
       const div = document.createElement('div');
       div.id = 'container-1a3077682e07f93cc463da97dcfbb39e';
@@ -249,6 +252,7 @@
       script2.src = 'https://regaincocoa.com/6d/2c/f7/6d2cf7db6ec8913764d6fc5b151dca28.js';
       script2.async = true;
       document.body.appendChild(script2);
+      adsLoaded = true;
       log('Anuncios activados');
     }
 
@@ -256,7 +260,7 @@
 
     checkbox.addEventListener('change', function() {
       Storage.set('hideAds', String(this.checked));
-      location.reload();
+      location.reload(); // Recargar para limpiar scripts correctamente
     });
   }
 
@@ -294,7 +298,7 @@
   }
 
   // ============================================================
-  //  AUTOCOMPLETADO (OpenSearch)
+  //  AUTOCOMPLETADO (OpenSearch) - CON LOGS DETALLADOS
   // ============================================================
   let debounceTimer;
   searchInput.addEventListener('input', function() {
@@ -307,12 +311,14 @@
     }
     debounceTimer = setTimeout(async () => {
       try {
+        log(`Sugerencias para "${query}" (${lang})`);
         const url = `https://${lang}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=6&namespace=0&format=json&origin=*`;
         const res = await fetch(url);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         const titles = data[1] || [];
         const descs = data[2] || [];
+        log(`Recibidas ${titles.length} sugerencias`);
         if (titles.length === 0) {
           suggestionsEl.classList.remove('visible');
           return;
@@ -333,7 +339,6 @@
           suggestionsEl.appendChild(li);
         });
         suggestionsEl.classList.add('visible');
-        log(`Sugerencias: ${titles.length}`);
       } catch (err) {
         log('Error sugerencias: ' + err.message);
         suggestionsEl.classList.remove('visible');
@@ -352,10 +357,10 @@
   });
 
   // ============================================================
-  //  RESUMEN LOCAL AVANZADO (TF-IDF simplificado)
+  //  RESUMEN LOCAL (TF-IDF simplificado)
   // ============================================================
   function localSummarize(text, targetLang, maxSentences = 5) {
-    log('Generando resumen local con TF-IDF...');
+    log('Generando resumen local...');
     const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 20);
     if (sentences.length === 0) return '<p>No hay suficientes oraciones para resumir.</p>';
 
@@ -390,10 +395,10 @@
   }
 
   // ============================================================
-  //  IA CON PROXY /api/proxy (usa la clave de entorno en Vercel)
+  //  IA CON PROXY /api/proxy
   // ============================================================
   async function aiSummarize(text, sourceLang, targetLang) {
-    log('Solicitando resumen con IA a través del proxy...');
+    log('Solicitando IA al proxy...');
     const prompt = `
       Resume el siguiente artículo de Wikipedia en ${targetLang.toUpperCase()}.
       Usa **negrita** para conceptos clave.
@@ -404,7 +409,7 @@
     `.trim();
 
     const payload = {
-      model: 'google/gemma-4-31b-it:free',
+      model: 'google/gemma-2-9b-it:free',
       messages: [
         { role: 'user', content: prompt }
       ],
@@ -430,7 +435,7 @@
   }
 
   // ============================================================
-  //  BÚSQUEDA PRINCIPAL
+  //  BÚSQUEDA PRINCIPAL - CON MANEJO DE ERRORES DETALLADO
   // ============================================================
   async function executeSearch() {
     suggestionsEl.classList.remove('visible');
@@ -450,10 +455,12 @@
     try {
       // Obtener extracto de Wikipedia
       const wikiUrl = `https://${sourceLang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&titles=${encodeURIComponent(query)}&origin=*&format=json`;
-      log('Fetching Wikipedia...');
+      log(`Fetching Wikipedia: ${wikiUrl}`);
       const wikiRes = await fetch(wikiUrl);
       if (!wikiRes.ok) throw new Error('HTTP ' + wikiRes.status + ' al conectar con Wikipedia.');
       const wikiData = await wikiRes.json();
+      log('Respuesta Wikipedia recibida');
+
       const pages = wikiData.query.pages;
       const pageId = Object.keys(pages)[0];
       const page = pages[pageId];
@@ -504,13 +511,4 @@
 
     } catch (err) {
       log('ERROR: ' + err.message);
-      showError(err.message + ' · Intenta con otro modo.', executeSearch);
-    }
-  }
-
-  window.executeSearch = executeSearch;
-
-  // ============================================================
-  //  INICIALIZACIÓN
-  // ============================================================
-  do
+      showError(err.message + ' · 
