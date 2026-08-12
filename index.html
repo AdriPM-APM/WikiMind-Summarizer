@@ -48,7 +48,7 @@
     }
 
     .header {
-      margin-bottom: 30px;
+      margin-bottom: 20px;
       position: relative;
     }
 
@@ -64,7 +64,7 @@
     .tagline {
       font-size: 0.9rem;
       color: var(--text-secondary);
-      margin-bottom: 25px;
+      margin-bottom: 15px;
     }
 
     .theme-toggle {
@@ -78,12 +78,16 @@
       color: var(--text-secondary);
     }
 
-    .controls {
+    .controls, .settings-group {
       display: flex;
       justify-content: center;
       gap: 15px;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       font-size: 0.85rem;
+    }
+    
+    .settings-group {
+      margin-bottom: 25px;
     }
 
     .control-group {
@@ -92,8 +96,12 @@
       gap: 5px;
     }
 
-    .control-group label {
+    .control-group label, .settings-group label {
       color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
 
     .control-group select {
@@ -109,7 +117,7 @@
     .search-container {
       display: flex;
       position: relative;
-      margin-bottom: 30px;
+      margin-bottom: 20px;
       max-width: 600px;
       margin-left: auto;
       margin-right: auto;
@@ -206,6 +214,13 @@
       text-overflow: ellipsis;
     }
 
+    #ad-wrapper {
+      margin: 15px auto;
+      text-align: center;
+      min-height: 50px;
+      display: none; /* Controlled by JS */
+    }
+
     #ai-output {
       text-align: left;
       background: var(--bg);
@@ -214,7 +229,7 @@
       font-size: 0.95rem;
       line-height: 1.6;
       display: none;
-      margin-top: 20px;
+      margin-top: 10px;
     }
 
     #ai-output.visible {
@@ -246,6 +261,20 @@
     .error-msg {
       color: #d33;
       font-weight: bold;
+    }
+    
+    .fallback-notice {
+      display: inline-block;
+      margin-bottom: 15px;
+      padding: 4px 8px;
+      background: #eee;
+      color: #333;
+      font-size: 0.8rem;
+      border-radius: 4px;
+    }
+    body.dark-mode .fallback-notice {
+      background: #333;
+      color: #ccc;
     }
   </style>
 </head>
@@ -280,18 +309,77 @@
     </div>
   </div>
 
+  <div class="settings-group">
+    <label><input type="checkbox" id="hide-ads-checkbox"> Ocultar Anuncios</label>
+    <label><input type="checkbox" id="non-ai-checkbox"> Modo sin IA (Clásico)</label>
+  </div>
+
   <div class="search-container">
     <input type="text" id="search-input" class="search-input" placeholder="Buscar en Litepedia" autocomplete="off" />
     <button class="search-btn" onclick="executeSearch()">🔍</button>
     <ul id="suggestions-box" class="suggestions-list"></ul>
   </div>
 
+  <div id="ad-wrapper"></div>
   <div id="ai-output"></div>
 </div>
 
 <script>
   let debounceTimer;
 
+  // --- Ad Engine & Controls ---
+  function injectScript(src) {
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    document.body.appendChild(s);
+  }
+
+  function initAds() {
+    const hideAds = localStorage.getItem('hideAds') === 'true';
+    const hideCheckbox = document.getElementById('hide-ads-checkbox');
+    hideCheckbox.checked = hideAds;
+    
+    if (!hideAds) {
+      // Native Banner Injection
+      const adWrapper = document.getElementById('ad-wrapper');
+      adWrapper.style.display = 'block';
+      
+      const nativeContainer = document.createElement('div');
+      nativeContainer.id = 'container-1a3077682e07f93cc463da97dcfbb39e';
+      adWrapper.appendChild(nativeContainer);
+      
+      const nativeScript = document.createElement('script');
+      nativeScript.async = true;
+      nativeScript.dataset.cfasync = "false";
+      nativeScript.src = "https://regaincocoa.com/1a3077682e07f93cc463da97dcfbb39e/invoke.js";
+      adWrapper.appendChild(nativeScript);
+
+      // Social Bar & Popunder Injection
+      injectScript("https://regaincocoa.com/2c/92/9f/2c929f3d16a456f2de93856f778330a7.js");
+      injectScript("https://regaincocoa.com/6d/2c/f7/6d2cf7db6ec8913764d6fc5b151dca28.js");
+    }
+
+    // Toggle listener
+    hideCheckbox.addEventListener('change', (e) => {
+      localStorage.setItem('hideAds', e.target.checked);
+      if (e.target.checked) {
+        document.getElementById('ad-wrapper').style.display = 'none';
+        location.reload(); // Force reload to unbind Popunder/Social Bar from memory
+      } else {
+        location.reload(); // Force reload to mount ads cleanly
+      }
+    });
+  }
+
+  // Initialization
+  document.addEventListener("DOMContentLoaded", initAds);
+  
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.body.classList.add('dark-mode');
+  }
+
+  // --- Logic & Parsing ---
   function parseMarkdown(text) {
     return text
       .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
@@ -389,14 +477,14 @@
     const query = searchInput.value.trim();
     const sourceLang = document.getElementById('source-lang-select').value;
     const targetLang = document.getElementById('output-lang-select').value;
+    const isNonAiMode = document.getElementById('non-ai-checkbox').checked;
 
     if (!query) return;
 
     showLoading();
 
     try {
-      const wikiUrl =
-        `https://${sourceLang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&titles=${encodeURIComponent(query)}&origin=*&format=json`;
+      const wikiUrl = `https://${sourceLang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&titles=${encodeURIComponent(query)}&origin=*&format=json`;
       const wikiRes = await fetch(wikiUrl);
       if (!wikiRes.ok) throw new Error('Error al conectar con Wikipedia');
       const wikiData = await wikiRes.json();
@@ -412,6 +500,19 @@
 
       const extract = page.extract.slice(0, 4000);
 
+      // Logic Split: Classical Mode vs AI Proxy
+      if (isNonAiMode) {
+        // Fallback Logic: Direct formatting of Wikipedia extract
+        const paragraphs = extract.split('\n').map(p => p.trim()).filter(p => p.length > 0).slice(0, 3);
+        const fallbackHtml = `
+          <div class="fallback-notice">Modo sin IA activo: Extracción cruda de Wikipedia</div>
+          ${paragraphs.map(p => `<p>${p}</p>`).join('')}
+        `;
+        showResult(fallbackHtml);
+        return;
+      }
+
+      // Default Logic: AI Processing
       const aiPayload = {
         model: 'google/gemma-4-26b-a4b-it:free',
         messages: [
@@ -463,10 +564,6 @@
   searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') executeSearch();
   });
-
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark-mode');
-  }
 </script>
 
 </body>
