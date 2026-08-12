@@ -62,12 +62,9 @@
     .mode-selector label {
       display:flex; align-items:center; gap:5px; cursor:pointer;
       color:var(--text-secondary); padding:4px 12px;
-      border-radius:20px; border:1px solid transparent; transition:0.2s;
+      border-radius:20px; border:1px solid var(--border); transition:0.2s;
     }
     .mode-selector input[type="radio"] { accent-color:var(--accent); }
-    .mode-selector label:has(input:checked) {
-      border-color:var(--accent); background:var(--accent); color:#fff;
-    }
     .search-container {
       display:flex; position:relative; max-width:600px; margin:0 auto 20px;
     }
@@ -129,8 +126,8 @@
     }
     .retry-btn {
       background:var(--accent); color:#fff; border:none;
-      padding:4px 14px; border-radius:4px; cursor:pointer;
-      font-size:0.8rem; margin-top:8px; display:block;
+      padding:6px 14px; border-radius:4px; cursor:pointer;
+      font-size:0.8rem; margin-top:8px; display:inline-block;
     }
     .retry-btn:hover { background:var(--accent-hover); }
     #debug {
@@ -179,7 +176,7 @@
 
   <div class="search-container">
     <input type="text" id="search-input" class="search-input" placeholder="Buscar en Wikipedia…" autocomplete="off" />
-    <button class="search-btn" id="search-btn">🔍</button>
+    <button class="search-btn" id="search-btn" type="button">🔍</button>
     <ul id="suggestions" class="suggestions-list"></ul>
   </div>
 
@@ -190,18 +187,20 @@
 
 <script>
   // ============================================================
-  //  DEPURACIÓN
+  //  CORE APPLICATION & STATE
   // ============================================================
   const debugEl = document.getElementById('debug');
+  const outputEl = document.getElementById('output');
+  const searchInput = document.getElementById('search-input');
+  const suggestionsEl = document.getElementById('suggestions');
+  const searchBtn = document.getElementById('search-btn');
+
   function log(msg) {
     debugEl.style.display = 'block';
     debugEl.textContent += `[${new Date().toISOString().substring(11,19)}] ${msg}\n`;
     console.log(msg);
   }
 
-  // ============================================================
-  //  HELPERS
-  // ============================================================
   function escapeHTML(str) {
     if (!str) return '';
     return str.replace(/[&<>'"]/g, tag => ({
@@ -218,69 +217,26 @@
       .replace(/\n/g, '<br>');
   }
 
-  // ============================================================
-  //  LOCAL STORAGE
-  // ============================================================
   const Storage = {
     get(key) { try { return localStorage.getItem(key); } catch(_){ return null; } },
     set(key, val) { try { localStorage.setItem(key, val); } catch(_){} }
   };
 
   // ============================================================
-  //  ANUNCIOS
+  //  UI DISPLAY HANDLERS
   // ============================================================
-  let adsLoaded = false;
-  function loadAds() {
-    const hideAds = Storage.get('hideAds') !== 'false';
-    const checkbox = document.getElementById('hide-ads');
-    checkbox.checked = hideAds;
-    const wrapper = document.getElementById('ad-wrapper');
-
-    function activate() {
-      if (adsLoaded) return;
-      wrapper.classList.add('active');
-      const div = document.createElement('div');
-      div.id = 'container-1a3077682e07f93cc463da97dcfbb39e';
-      wrapper.appendChild(div);
-      const script1 = document.createElement('script');
-      script1.async = true;
-      script1.dataset.cfasync = 'false';
-      script1.src = 'https://regaincocoa.com/1a3077682e07f93cc463da97dcfbb39e/invoke.js';
-      wrapper.appendChild(script1);
-      const script2 = document.createElement('script');
-      script2.src = 'https://regaincocoa.com/6d/2c/f7/6d2cf7db6ec8913764d6fc5b151dca28.js';
-      script2.async = true;
-      document.body.appendChild(script2);
-      adsLoaded = true;
-      log('Anuncios activados');
-    }
-
-    if (!hideAds) activate();
-
-    checkbox.addEventListener('change', function() {
-      Storage.set('hideAds', String(this.checked));
-      location.reload();
-    });
-  }
-
-  // ============================================================
-  //  UI STATE
-  // ============================================================
-  const outputEl = document.getElementById('output');
-  const searchInput = document.getElementById('search-input');
-  const suggestionsEl = document.getElementById('suggestions');
-  const searchBtn = document.getElementById('search-btn');
-
   function showLoading() {
     outputEl.className = 'visible';
-    outputEl.innerHTML = `<div class="loading">⏳ Procesando…</div>`;
+    outputEl.innerHTML = `<div class="loading">⏳ Cargando datos de Wikipedia...</div>`;
   }
 
-  function showError(msg, retryFn = null) {
+  function showError(msg) {
     outputEl.className = 'visible';
-    let html = `<div class="error-msg">❌ ${escapeHTML(msg)}</div>`;
-    if (retryFn) html += `<button class="retry-btn" onclick="${retryFn}">Reintentar</button>`;
-    outputEl.innerHTML = html;
+    outputEl.innerHTML = `
+      <div class="error-msg">❌ ${escapeHTML(msg)}</div>
+      <button class="retry-btn" id="retry-action">Reintentar</button>
+    `;
+    document.getElementById('retry-action')?.addEventListener('click', executeSearch);
   }
 
   function showResult(html) {
@@ -289,86 +245,17 @@
   }
 
   // ============================================================
-  //  TEMA OSCURO
-  // ============================================================
-  const toggleTheme = () => document.body.classList.toggle('dark-mode');
-  document.getElementById('theme-toggle-btn').addEventListener('click', toggleTheme);
-
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark-mode');
-  }
-
-  // ============================================================
-  //  AUTOCOMPLETADO (OpenSearch)
-  // ============================================================
-  let debounceTimer;
-  searchInput.addEventListener('input', function() {
-    clearTimeout(debounceTimer);
-    const query = this.value.trim();
-    const lang = document.getElementById('source-lang').value;
-    if (query.length < 2) {
-      suggestionsEl.classList.remove('visible');
-      return;
-    }
-    debounceTimer = setTimeout(async () => {
-      try {
-        log(`Sugerencias para "${query}" (${lang})`);
-        const url = `https://${lang}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=6&namespace=0&format=json&origin=*`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        const titles = data[1] || [];
-        const descs = data[2] || [];
-        log(`Recibidas ${titles.length} sugerencias`);
-        if (titles.length === 0) {
-          suggestionsEl.classList.remove('visible');
-          return;
-        }
-        suggestionsEl.innerHTML = '';
-        titles.forEach((title, i) => {
-          const li = document.createElement('li');
-          li.className = 'suggestion-item';
-          li.innerHTML = `
-            <span class="suggestion-title">${escapeHTML(title)}</span>
-            <span class="suggestion-desc">${escapeHTML(descs[i] || 'Artículo')}</span>
-          `;
-          li.addEventListener('click', () => {
-            searchInput.value = title;
-            suggestionsEl.classList.remove('visible');
-            executeSearch();
-          });
-          suggestionsEl.appendChild(li);
-        });
-        suggestionsEl.classList.add('visible');
-      } catch (err) {
-        log('Error sugerencias: ' + err.message);
-        suggestionsEl.classList.remove('visible');
-      }
-    }, 300);
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!searchInput.contains(e.target) && !suggestionsEl.contains(e.target)) {
-      suggestionsEl.classList.remove('visible');
-    }
-  });
-
-  searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') executeSearch();
-  });
-
-  // ============================================================
-  //  RESUMEN LOCAL (TF-IDF simplificado)
+  //  LOCAL SUMMARIZER ENGINE (TF-IDF)
   // ============================================================
   function localSummarize(text, targetLang, maxSentences = 5) {
-    log('Generando resumen local...');
+    log('Ejecutando motor de resumen local...');
     const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 20);
-    if (sentences.length === 0) return '<p>No hay suficientes oraciones para resumir.</p>';
+    if (sentences.length === 0) return '<p>No hay suficientes oraciones para procesar.</p>';
 
     const stopwords = new Set([
       'el','la','los','las','un','una','unos','unas','de','del','en','y','a','que','por','para','con','sin','sobre',
       'entre','tras','durante','mediante','según','hasta','desde','cuando','donde','mientras','aunque','porque','como',
-      'cual','cuyo','quien','donde','cuanto','muy','más','menos','tan','tanto','ni','o','u','sino','si','no','ya','bien'
+      'cual','cuyo','quien','cuanto','muy','más','menos','tan','tanto','ni','o','u','sino','si','no','ya','bien'
     ]);
 
     const wordFreq = {};
@@ -391,91 +278,72 @@
     const ordered = sentences.filter(s => top.includes(s));
 
     const summary = ordered.map(s => `<p>${escapeHTML(s)}.</p>`).join('');
-    const label = `🧠 Resumen local (${targetLang.toUpperCase()})`;
-    return `<div class="badge">${label}</div>${summary}`;
+    return `<div class="badge">🧠 Resumen Local (${targetLang.toUpperCase()})</div>${summary}`;
   }
 
   // ============================================================
-  //  IA CON PROXY /api/proxy
+  //  AI PROXY SUMMARIZER
   // ============================================================
   async function aiSummarize(text, sourceLang, targetLang) {
-    log('Solicitando IA al proxy...');
-    const prompt = `
-      Resume el siguiente artículo de Wikipedia en ${targetLang.toUpperCase()}.
-      Usa **negrita** para conceptos clave.
-      Máximo 3 párrafos.
-      Artículo (en ${sourceLang.toUpperCase()}):
-      ${text.slice(0, 4000)}
-      Resumen en ${targetLang.toUpperCase()}:
-    `.trim();
-
-    const payload = {
-      model: 'google/gemma-2-9b-it:free',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 500
-    };
+    log('Enviando consulta a la API de IA...');
+    const prompt = `Resume el siguiente artículo de Wikipedia en ${targetLang.toUpperCase()}. Usa **negrita** para conceptos clave. Máximo 3 párrafos.\n\nTexto (${sourceLang.toUpperCase()}):\n${text.slice(0, 4000)}`;
 
     const response = await fetch('/api/proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        model: 'google/gemma-2-9b-it:free',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 500
+      })
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Proxy HTTP ${response.status}: ${errorText}`);
-    }
+    if (!response.ok) throw new Error(`Proxy HTTP error: status ${response.status}`);
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
-    if (!content || content.length < 10) throw new Error('Respuesta de IA vacía o inválida.');
-    log('Proxy respondió correctamente');
+    if (!content || content.length < 10) throw new Error('Respuesta de IA vacía.');
     return content;
   }
 
   // ============================================================
-  //  BÚSQUEDA PRINCIPAL
+  //  MAIN SEARCH CONTROLLER
   // ============================================================
   async function executeSearch() {
     suggestionsEl.classList.remove('visible');
     const query = searchInput.value.trim();
     if (!query) {
-      log('Búsqueda vacía abortada');
+      log('Búsqueda vacía cancelada.');
       return;
     }
 
     const sourceLang = document.getElementById('source-lang').value;
     const targetLang = document.getElementById('target-lang').value;
-    const selectedModeEl = document.querySelector('input[name="summary-mode"]:checked');
-    const mode = selectedModeEl ? selectedModeEl.value : 'extract';
+    const modeEl = document.querySelector('input[name="summary-mode"]:checked');
+    const mode = modeEl ? modeEl.value : 'extract';
 
-    log(`Buscar: "${query}" | Origen: ${sourceLang} | Modo: ${mode}`);
+    log(`Iniciando búsqueda: "${query}" | Idioma: ${sourceLang} | Modo: ${mode}`);
     showLoading();
 
     try {
-      const wikiUrl = `https://${sourceLang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&titles=${encodeURIComponent(query)}&origin=*&format=json`;
-      log(`Fetching Wikipedia API...`);
+      // Standardized MediaWiki API Request (formatversion=2 & redirects=1 resolve structural issues)
+      const wikiUrl = `https://${sourceLang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&redirects=1&titles=${encodeURIComponent(query)}&format=json&formatversion=2&origin=*`;
       
       const wikiRes = await fetch(wikiUrl);
-      if (!wikiRes.ok) throw new Error(`HTTP ${wikiRes.status} al conectar con Wikipedia.`);
-      
+      if (!wikiRes.ok) throw new Error(`Error de conexión con Wikipedia (HTTP ${wikiRes.status})`);
+
       const wikiData = await wikiRes.json();
-      const pages = wikiData.query?.pages;
-      
-      if (!pages) throw new Error('Estructura de respuesta inválida desde Wikipedia.');
+      const page = wikiData.query?.pages?.[0];
 
-      const pageId = Object.keys(pages)[0];
-      const page = pages[pageId];
-
-      if (pageId === '-1' || page.missing) {
-        throw new Error(`No se encontró el artículo "${query}" en Wikipedia (${sourceLang}).`);
+      if (!page || page.missing) {
+        throw new Error(`No se encontró el artículo "${query}" en Wikipedia (${sourceLang.toUpperCase()}).`);
       }
       if (!page.extract || page.extract.trim() === '') {
-        throw new Error('El artículo no contiene texto extraíble.');
+        throw new Error('El artículo no contiene texto suficiente para procesar.');
       }
 
       const extract = page.extract;
-      log(`Extracto obtenido: ${extract.length} caracteres`);
+      log(`Extracto procesado (${extract.length} caracteres).`);
 
       let resultHtml = '';
 
@@ -486,26 +354,156 @@
           .slice(0, 8)
           .map(p => `<p>${escapeHTML(p)}</p>`)
           .join('');
-        resultHtml = `<div class="badge">📄 Extracto directo de Wikipedia</div>${paragraphs}`;
+        resultHtml = `<div class="badge">📄 Extracto Directo</div>${paragraphs}`;
       } else if (mode === 'local') {
         resultHtml = localSummarize(extract, targetLang);
       } else if (mode === 'ai') {
         try {
           const aiText = await aiSummarize(extract, sourceLang, targetLang);
-          resultHtml = `<div class="badge">🤖 Resumen con IA (${targetLang.toUpperCase()})</div>${parseMarkdown(aiText)}`;
+          resultHtml = `<div class="badge">🤖 Resumen IA (${targetLang.toUpperCase()})</div>${parseMarkdown(aiText)}`;
         } catch (aiErr) {
-          log(`Fallo IA: ${aiErr.message} → aplicando fallback Local`);
+          log(`Fallo de IA: ${aiErr.message}. Redirigiendo a modo Local.`);
           const fallback = localSummarize(extract, targetLang);
           resultHtml = `
-            <div class="badge" style="background:#f9e0d0;color:#7a3a1a;">⚠️ Fallo de IA (${escapeHTML(aiErr.message)}). Mostrando resumen local:</div>
+            <div class="badge" style="background:#f9e0d0;color:#7a3a1a;">⚠️ Servidor IA no disponible. Mostrando resumen local:</div>
             ${fallback}
           `;
         }
       }
 
-      resultHtml += `<div class="source-note">Fuente: ${sourceLang}.wikipedia.org · ${escapeHTML(page.title)}</div>`;
+      resultHtml += `<div class="source-note">Fuente: ${sourceLang}.wikipedia.org · Artículo: <b>${escapeHTML(page.title)}</b></div>`;
       showResult(resultHtml);
 
     } catch (err) {
-      log('ERROR CRÍTICO: ' + err.message);
-      showError(err.mess
+      log(`ERROR: ${err.message}`);
+      showError(err.message);
+    }
+  }
+
+  // ============================================================
+  //  SAFE AD INITIALIZATION (Prevents document.write crashes)
+  // ============================================================
+  function loadAdsSafely() {
+    try {
+      const hideAds = Storage.get('hideAds') !== 'false';
+      const checkbox = document.getElementById('hide-ads');
+      if (checkbox) checkbox.checked = hideAds;
+      if (hideAds) return;
+
+      const wrapper = document.getElementById('ad-wrapper');
+      if (!wrapper) return;
+
+      wrapper.classList.add('active');
+      
+      // Override document.write while ad scripts load to prevent DOM erasure
+      const originalWrite = document.write;
+      document.write = function(str) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = str;
+        wrapper.appendChild(tempDiv);
+      };
+
+      const script = document.createElement('script');
+      script.async = true;
+      script.src = 'https://regaincocoa.com/1a3077682e07f93cc463da97dcfbb39e/invoke.js';
+      script.onload = () => { document.write = originalWrite; };
+      script.onerror = () => { document.write = originalWrite; log('Ad script blocked or failed.'); };
+      
+      wrapper.appendChild(script);
+    } catch(e) {
+      log(`Ad init skipped: ${e.message}`);
+    }
+  }
+
+  // ============================================================
+  //  EVENT BINDINGS & INITIALIZATION
+  // ============================================================
+  function init() {
+    // 1. Bind search triggers immediately
+    searchBtn.addEventListener('click', executeSearch);
+    
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') executeSearch();
+    });
+
+    // 2. Theme toggle binding
+    document.getElementById('theme-toggle-btn').addEventListener('click', () => {
+      document.body.classList.toggle('dark-mode');
+    });
+
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.body.classList.add('dark-mode');
+    }
+
+    // 3. Autocomplete / OpenSearch handler
+    let debounceTimer;
+    searchInput.addEventListener('input', function() {
+      clearTimeout(debounceTimer);
+      const query = this.value.trim();
+      const lang = document.getElementById('source-lang').value;
+      if (query.length < 2) {
+        suggestionsEl.classList.remove('visible');
+        return;
+      }
+      debounceTimer = setTimeout(async () => {
+        try {
+          const url = `https://${lang}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=6&namespace=0&format=json&origin=*`;
+          const res = await fetch(url);
+          if (!res.ok) return;
+          const data = await res.json();
+          const titles = data[1] || [];
+          const descs = data[2] || [];
+          
+          if (titles.length === 0) {
+            suggestionsEl.classList.remove('visible');
+            return;
+          }
+          
+          suggestionsEl.innerHTML = '';
+          titles.forEach((title, i) => {
+            const li = document.createElement('li');
+            li.className = 'suggestion-item';
+            li.innerHTML = `
+              <span class="suggestion-title">${escapeHTML(title)}</span>
+              <span class="suggestion-desc">${escapeHTML(descs[i] || 'Artículo')}</span>
+            `;
+            li.addEventListener('click', () => {
+              searchInput.value = title;
+              suggestionsEl.classList.remove('visible');
+              executeSearch();
+            });
+            suggestionsEl.appendChild(li);
+          });
+          suggestionsEl.classList.add('visible');
+        } catch (_) {
+          suggestionsEl.classList.remove('visible');
+        }
+      }, 300);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!searchInput.contains(e.target) && !suggestionsEl.contains(e.target)) {
+        suggestionsEl.classList.remove('visible');
+      }
+    });
+
+    // 4. Ad settings listener
+    document.getElementById('hide-ads')?.addEventListener('change', function() {
+      Storage.set('hideAds', String(this.checked));
+      location.reload();
+    });
+
+    // 5. Load external scripts non-blockingly
+    loadAdsSafely();
+    log('WikiMind inicializado correctamente.');
+  }
+
+  // Ensure DOM is fully loaded before executing setup
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+</script>
+</body>
+</html>
