@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WikiMind · Enciclopedia resumida</title>
+  <title>WikiMind · Enciclopedia con IA</title>
   <style>
     /* ===== Variables ===== */
     :root {
@@ -40,7 +40,7 @@
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      padding: 40px 20px;
+      padding: 30px 15px;
     }
 
     .app {
@@ -57,7 +57,7 @@
 
     .logo {
       font-family: var(--font-serif);
-      font-size: 3rem;
+      font-size: 2.8rem;
       font-weight: normal;
       color: var(--text);
       letter-spacing: -0.5px;
@@ -86,8 +86,8 @@
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 20px 30px;
-      margin-bottom: 15px;
+      gap: 15px 25px;
+      margin-bottom: 12px;
       font-size: 0.85rem;
     }
 
@@ -116,8 +116,8 @@
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 20px 30px;
-      margin-bottom: 20px;
+      gap: 15px 25px;
+      margin-bottom: 12px;
       font-size: 0.85rem;
     }
 
@@ -127,6 +127,43 @@
       gap: 5px;
       color: var(--text-secondary);
       cursor: pointer;
+    }
+
+    /* ===== Modos de resumen ===== */
+    .mode-selector {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px 20px;
+      margin-bottom: 15px;
+      font-size: 0.9rem;
+    }
+
+    .mode-selector label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid transparent;
+      transition: 0.2s;
+    }
+
+    .mode-selector input[type="radio"] {
+      accent-color: var(--accent);
+    }
+
+    .mode-selector label:has(input:checked) {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    body.dark-mode .mode-selector label:has(input:checked) {
+      background: var(--accent);
+      color: #fff;
     }
 
     /* ===== Search ===== */
@@ -231,10 +268,10 @@
 
     /* ===== Ad Container ===== */
     #ad-wrapper {
-      margin: 15px auto 20px;
+      margin: 10px auto 15px;
       text-align: center;
-      min-height: 60px;
-      display: none; /* oculto por defecto */
+      min-height: 50px;
+      display: none;
     }
 
     #ad-wrapper.active {
@@ -245,8 +282,7 @@
       display: inline-block;
       background: var(--bg);
       border-radius: 6px;
-      padding: 6px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      padding: 4px;
     }
 
     /* ===== Output ===== */
@@ -254,7 +290,7 @@
       text-align: left;
       background: var(--bg);
       border: 1px solid var(--border);
-      padding: 24px;
+      padding: 20px 22px;
       font-size: 0.95rem;
       line-height: 1.6;
       margin-top: 10px;
@@ -291,20 +327,20 @@
       font-weight: 600;
     }
 
-    .fallback-badge {
+    .badge {
       display: inline-block;
-      margin-bottom: 12px;
-      padding: 3px 10px;
-      background: #eee;
-      color: #333;
+      margin-bottom: 10px;
+      padding: 2px 12px;
+      background: #e8f0fe;
+      color: #1a3b6a;
       font-size: 0.75rem;
       border-radius: 12px;
       font-weight: 600;
     }
 
-    body.dark-mode .fallback-badge {
-      background: #2a2a2a;
-      color: #ccc;
+    body.dark-mode .badge {
+      background: #2a3a5a;
+      color: #c8d8f0;
     }
 
     .source-note {
@@ -314,6 +350,21 @@
       border-top: 1px solid var(--border);
       padding-top: 10px;
     }
+
+    .retry-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 4px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      margin-top: 8px;
+    }
+
+    .retry-btn:hover {
+      background: var(--accent-hover);
+    }
   </style>
 </head>
 <body>
@@ -321,13 +372,13 @@
   <header class="header">
     <button class="theme-toggle" onclick="toggleTheme()" aria-label="Cambiar tema">🌓</button>
     <div class="logo">WikiMind</div>
-    <div class="tagline">La enciclopedia resumida</div>
+    <div class="tagline">Enciclopedia con resumen inteligente</div>
   </header>
 
   <!-- Controles de idioma -->
   <div class="controls">
     <div class="control-group">
-      <label for="source-lang">De:</label>
+      <label for="source-lang">Idioma origen:</label>
       <select id="source-lang">
         <option value="en">EN</option>
         <option value="es" selected>ES</option>
@@ -337,7 +388,7 @@
       </select>
     </div>
     <div class="control-group">
-      <label for="target-lang">A (IA):</label>
+      <label for="target-lang">Idioma resumen:</label>
       <select id="target-lang">
         <option value="en">EN</option>
         <option value="es" selected>ES</option>
@@ -347,15 +398,27 @@
     </div>
   </div>
 
+  <!-- Modos de resumen -->
+  <div class="mode-selector">
+    <label>
+      <input type="radio" name="summary-mode" value="extract" checked />
+      📄 Extracto completo
+    </label>
+    <label>
+      <input type="radio" name="summary-mode" value="local" />
+      🧠 Resumen local
+    </label>
+    <label>
+      <input type="radio" name="summary-mode" value="ai" />
+      🤖 Resumen con IA
+    </label>
+  </div>
+
   <!-- Ajustes -->
   <div class="settings">
     <label>
       <input type="checkbox" id="hide-ads" checked />
       Ocultar anuncios
-    </label>
-    <label>
-      <input type="checkbox" id="non-ai-mode" checked />
-      Modo sin IA (extracto directo)
     </label>
   </div>
 
@@ -366,10 +429,8 @@
     <ul id="suggestions" class="suggestions-list"></ul>
   </div>
 
-  <!-- Contenedor de anuncios (banner nativo) -->
-  <div id="ad-wrapper">
-    <!-- Aquí se inyectará el div del banner cuando los anuncios estén activos -->
-  </div>
+  <!-- Contenedor de anuncios -->
+  <div id="ad-wrapper"></div>
 
   <!-- Resultado -->
   <div id="output"></div>
@@ -380,6 +441,7 @@
   //  HELPERS
   // ============================================================
   function escapeHTML(str) {
+    if (!str) return '';
     return str.replace(/[&<>'"]/g, tag => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;',
       "'": '&#39;', '"': '&quot;'
@@ -410,45 +472,40 @@
   //  ANUNCIOS
   // ============================================================
   function loadAds() {
-    const hideAds = StorageManager.get('hideAds') !== 'false'; // por defecto true (ocultos)
+    const hideAds = StorageManager.get('hideAds') !== 'false'; // por defecto true
     const checkbox = document.getElementById('hide-ads');
     checkbox.checked = hideAds;
 
     const adWrapper = document.getElementById('ad-wrapper');
 
     function activateAds() {
-      // Mostrar el contenedor
       adWrapper.classList.add('active');
 
-      // 1. Crear el div para el banner nativo
+      // Div para el banner nativo
       const bannerDiv = document.createElement('div');
       bannerDiv.id = 'container-1a3077682e07f93cc463da97dcfbb39e';
       adWrapper.appendChild(bannerDiv);
 
-      // 2. Cargar el script del banner (invoke.js)
+      // Script del banner
       const bannerScript = document.createElement('script');
       bannerScript.async = true;
       bannerScript.dataset.cfasync = 'false';
       bannerScript.src = 'https://regaincocoa.com/1a3077682e07f93cc463da97dcfbb39e/invoke.js';
       adWrapper.appendChild(bannerScript);
 
-      // 3. Cargar el popunder (se ejecuta solo al añadirlo)
+      // Popunder
       const popunderScript = document.createElement('script');
       popunderScript.src = 'https://regaincocoa.com/6d/2c/f7/6d2cf7db6ec8913764d6fc5b151dca28.js';
       popunderScript.async = true;
       document.body.appendChild(popunderScript);
     }
 
-    // Si el usuario NO quiere ocultar anuncios → mostrarlos
     if (!hideAds) {
       activateAds();
     }
 
-    // Manejar cambio en el checkbox
     checkbox.addEventListener('change', function () {
-      const newState = this.checked; // true = ocultar, false = mostrar
-      StorageManager.set('hideAds', String(newState));
-      // Recargar para aplicar cambios (los scripts se añaden o no)
+      StorageManager.set('hideAds', String(this.checked));
       location.reload();
     });
   }
@@ -465,9 +522,13 @@
     outputEl.innerHTML = `<div class="loading">⏳ Procesando…</div>`;
   }
 
-  function showError(msg) {
+  function showError(msg, retryFn = null) {
     outputEl.className = 'visible';
-    outputEl.innerHTML = `<div class="error-msg">❌ ${escapeHTML(msg)}</div>`;
+    let html = `<div class="error-msg">❌ ${escapeHTML(msg)}</div>`;
+    if (retryFn) {
+      html += `<button class="retry-btn" onclick="(${retryFn.toString()})()">Reintentar</button>`;
+    }
+    outputEl.innerHTML = html;
   }
 
   function showResult(html) {
@@ -546,6 +607,55 @@
   });
 
   // ============================================================
+  //  FUNCIONES DE RESUMEN
+  // ============================================================
+
+  // Resumen local (simple: primeros párrafos + resaltado de mayúsculas)
+  function localSummarize(text, targetLang) {
+    const paragraphs = text.split('\n').map(p => p.trim()).filter(p => p.length > 20);
+    let summary = paragraphs.slice(0, 3).join('\n\n');
+    if (summary.length > 2500) summary = summary.slice(0, 2500) + '…';
+    // Marcar palabras con mayúscula inicial como negrita (intento de resaltar conceptos)
+    const lines = summary.split('\n').map(line => {
+      const words = line.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        const w = words[i];
+        if (w.length > 2 && /^[A-ZÁÉÍÓÚÑ]/.test(w) && !/^[A-ZÁÉÍÓÚÑ]{2,}$/.test(w)) {
+          words[i] = `**${w}**`;
+          break; // solo la primera palabra con mayúscula
+        }
+      }
+      return words.join(' ');
+    });
+    summary = lines.join('\n');
+    const label = `🧠 Resumen local (${targetLang.toUpperCase()})`;
+    return `<div class="badge">${label}</div>${parseMarkdown(summary)}`;
+  }
+
+  // Resumen con IA (Pollinations)
+  async function aiSummarize(text, sourceLang, targetLang) {
+    const prompt = `
+      Resume el siguiente artículo de Wikipedia en ${targetLang.toUpperCase()}.
+      Usa **negrita** para conceptos clave.
+      Máximo 3 párrafos.
+      Artículo (en ${sourceLang.toUpperCase()}):
+      ${text.slice(0, 4000)}
+      Resumen en ${targetLang.toUpperCase()}:
+    `.trim();
+
+    const url = `https://text.pollinations.ai/prompt?prompt=${encodeURIComponent(prompt)}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'text/plain' }
+    });
+
+    if (!response.ok) throw new Error(`Error HTTP ${response.status}`);
+    const result = await response.text();
+    if (!result || result.length < 10) throw new Error('Respuesta vacía o muy corta');
+    return result;
+  }
+
+  // ============================================================
   //  BÚSQUEDA PRINCIPAL
   // ============================================================
   window.executeSearch = async function() {
@@ -556,7 +666,7 @@
 
     const sourceLang = document.getElementById('source-lang').value;
     const targetLang = document.getElementById('target-lang').value;
-    const nonAI = document.getElementById('non-ai-mode').checked;
+    const mode = document.querySelector('input[name="summary-mode"]:checked').value;
 
     showLoading();
 
@@ -564,7 +674,7 @@
       // 1. Obtener extracto de Wikipedia
       const wikiUrl = `https://${sourceLang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&titles=${encodeURIComponent(query)}&origin=*&format=json`;
       const wikiRes = await fetch(wikiUrl);
-      if (!wikiRes.ok) throw new Error('No se pudo conectar con Wikipedia.');
+      if (!wikiRes.ok) throw new Error('No se pudo conectar con Wikipedia. Verifica tu conexión.');
       const wikiData = await wikiRes.json();
       const page = Object.values(wikiData.query.pages)[0];
 
@@ -575,10 +685,11 @@
         throw new Error('El artículo está vacío o no tiene contenido textual.');
       }
 
-      const extract = page.extract.slice(0, 5000);
+      const extract = page.extract;
 
-      // 2. Modo sin IA → mostrar extracto directamente
-      if (nonAI) {
+      // 2. Según el modo seleccionado
+      if (mode === 'extract') {
+        // Extracto completo (hasta 8 párrafos)
         const paragraphs = extract.split('\n')
           .map(p => p.trim())
           .filter(p => p.length > 0)
@@ -587,46 +698,27 @@
           .join('');
 
         showResult(`
-          <div class="fallback-badge">📄 Modo sin IA · Extracto de Wikipedia</div>
+          <div class="badge">📄 Extracto completo de Wikipedia</div>
           ${paragraphs}
           <div class="source-note">Fuente: ${sourceLang}.wikipedia.org · ${escapeHTML(page.title)}</div>
         `);
         return;
       }
 
-      // 3. Modo IA → resumir con Pollinations (gratuito, sin clave)
-      const prompt = `
-        Eres un asistente que resume artículos de Wikipedia.
-        Responde SIEMPRE en el idioma: ${targetLang}.
-        Usa **negrita** para conceptos clave.
-        Máximo 3 párrafos.
-        Artículo (en ${sourceLang}):
-        ${extract}
-        Resumen en ${targetLang}:
-      `.trim();
+      if (mode === 'local') {
+        const html = localSummarize(extract, targetLang);
+        showResult(html + `<div class="source-note">Fuente: ${sourceLang}.wikipedia.org · ${escapeHTML(page.title)}</div>`);
+        return;
+      }
 
-      const aiUrl = `https://text.pollinations.ai/prompt?prompt=${encodeURIComponent(prompt)}`;
-      const aiRes = await fetch(aiUrl);
-      if (!aiRes.ok) throw new Error('Error al consultar el servicio de IA (Pollinations).');
-      const aiText = await aiRes.text();
-
-      if (!aiText || aiText.length < 10) throw new Error('La IA devolvió una respuesta vacía o muy corta.');
-
-      showResult(parseMarkdown(aiText));
-
-    } catch (err) {
-      console.error(err);
-      showError(err.message + ' · Comprueba tu conexión o intenta con el modo sin IA.');
-    }
-  };
-
-  // ============================================================
-  //  INICIALIZACIÓN
-  // ============================================================
-  document.addEventListener('DOMContentLoaded', () => {
-    // Cargar estado de los anuncios (y activarlos si corresponde)
-    loadAds();
-  });
-</script>
-</body>
-      </html>
+      if (mode === 'ai') {
+        try {
+          const aiText = await aiSummarize(extract, sourceLang, targetLang);
+          const label = `🤖 Resumen con IA (${targetLang.toUpperCase()})`;
+          showResult(`<div class="badge">${label}</div>${parseMarkdown(aiText)}<div class="source-note">Fuente: ${sourceLang}.wikipedia.org · ${escapeHTML(page.title)}</div>`);
+        } catch (aiErr) {
+          console.error('Error en IA:', aiErr);
+          // Fallback a resumen local con advertencia
+          const fallbackHtml = localSummarize(extract, targetLang);
+          showResult(`
+            <div class="badge" style="background:#f9e0d0;color:#7a3a1a;">⚠️ La IA no respondió, mostrando resumen local
