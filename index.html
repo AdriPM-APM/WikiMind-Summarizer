@@ -327,7 +327,272 @@
 
 <script>
   let debounceTimer;
+  //--- Anti-Ad Blocker --
+  /**
+ * Hardened Anti-AdBlock Engine
+ * Standard-compliant, zero-dependency, self-defending architecture.
+ */
+(function () {
+    'use strict';
 
+    const GuardConfig = Object.freeze({
+        checkInterval: 2500,
+        networkProbeUrl: 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js',
+        baitClasses: ['adsbygoogle', 'ad-banner', 'ad-unit', 'sponsored-ad', 'adbox'],
+        randomPrefix: () => 'a' + Math.random().toString(36).substring(2, 9)
+    });
+
+    class AdBlockGuardEngine {
+        constructor() {
+            this.state = {
+                blocked: false,
+                hostElement: null,
+                shadowRoot: null,
+                observer: null
+            };
+            this.hostId = GuardConfig.randomPrefix();
+        }
+
+        async init() {
+            // Run multi-vector detection concurrently
+            const results = await Promise.all([
+                this.detectNetworkBlock(),
+                this.detectScriptletPill(),
+                this.detectDomBait()
+            ]);
+
+            if (results.some(Boolean)) {
+                this.triggerEnforcement();
+            } else {
+                this.startPassiveMonitoring();
+            }
+        }
+
+        // --- Vector 1: Network Probe (Detects DNS/Extension Request Blocking) ---
+        async detectNetworkBlock() {
+            try {
+                const response = await fetch(GuardConfig.networkProbeUrl, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    cache: 'no-store'
+                });
+                return response.type === 'opaque' ? false : false;
+            } catch (err) {
+                // ERR_BLOCKED_BY_CLIENT / ERR_NAME_NOT_RESOLVED
+                return true;
+            }
+        }
+
+        // --- Vector 2: Scriptlet & Object Integrity (Detects uBlock/AdGuard stubs) ---
+        detectScriptletPill() {
+            if (window.adsbygoogle) {
+                // Check if adsbygoogle has been neutered to a plain array or empty stub object
+                const isArray = Array.isArray(window.adsbygoogle);
+                const hasPushed = typeof window.adsbygoogle.push === 'function';
+                
+                // Blockers often inject a stub with length = 0 or custom dummy properties
+                if (window.adsbygoogle.loaded === false || (isArray && !hasPushed)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // --- Vector 3: Cosmetic / DOM Bait Detection ---
+        detectDomBait() {
+            const bait = document.createElement('div');
+            bait.className = GuardConfig.baitClasses.join(' ');
+            bait.style.cssText = 'position:absolute!important;left:-9999px!important;top:-9999px!important;height:10px!important;width:10px!important;pointer-events:none!important;';
+            bait.setAttribute('aria-hidden', 'true');
+
+            document.body.appendChild(bait);
+
+            const computed = window.getComputedStyle(bait);
+            const isHidden = 
+                bait.offsetHeight === 0 ||
+                bait.offsetWidth === 0 ||
+                computed.display === 'none' ||
+                computed.visibility === 'hidden' ||
+                computed.opacity === '0';
+
+            document.body.removeChild(bait);
+            return isHidden;
+        }
+
+        // --- Enforcement System: Closed Shadow DOM Shield ---
+        triggerEnforcement() {
+            if (this.state.blocked) return;
+            this.state.blocked = true;
+
+            this.mountEnforcementOverlay();
+            this.attachSelfHealingObserver();
+        }
+
+        mountEnforcementOverlay() {
+            // Remove existing host if present
+            if (this.state.hostElement && this.state.hostElement.isConnected) {
+                this.state.hostElement.remove();
+            }
+
+            // Create Host Container with dynamic custom tag name
+            this.hostId = GuardConfig.randomPrefix();
+            this.state.hostElement = document.createElement(GuardConfig.randomPrefix());
+            
+            // Apply host styles directly to ensure modal stays full-screen
+            Object.assign(this.state.hostElement.style, {
+                position: 'fixed',
+                top: '0',
+                left: '0',
+                width: '100vw',
+                height: '100vh',
+                zIndex: '2147483647', // Maximum 32-bit signed integer
+                display: 'block'
+            });
+
+            // Create Closed Shadow Root (Shields inner CSS from AdBlock Element Hiding Rules)
+            this.state.shadowRoot = this.state.hostElement.attachShadow({ mode: 'closed' });
+
+            // Render Self-Contained Styles & Markup inside Shadow Root
+            this.state.shadowRoot.innerHTML = `
+                <style>
+                    :host { all: initial; }
+                    .backdrop {
+                        position: fixed;
+                        inset: 0;
+                        background: rgba(15, 23, 42, 0.75);
+                        backdrop-filter: blur(8px);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                        z-index: 2147483647;
+                    }
+                    .card {
+                        background: #ffffff;
+                        max-width: 480px;
+                        width: 90%;
+                        padding: 32px;
+                        border-radius: 16px;
+                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+                        text-align: center;
+                        border: 1px solid #f1f5f9;
+                    }
+                    .icon-container {
+                        width: 56px;
+                        height: 56px;
+                        background: #fef2f2;
+                        border-radius: 50%;
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-bottom: 20px;
+                    }
+                    .icon {
+                        width: 28px;
+                        height: 28px;
+                        fill: #dc2626;
+                    }
+                    h2 {
+                        margin: 0 0 8px 0;
+                        color: #0f172a;
+                        font-size: 20px;
+                        font-weight: 600;
+                    }
+                    p {
+                        margin: 0 0 24px 0;
+                        color: #475569;
+                        font-size: 14px;
+                        line-height: 1.5;
+                    }
+                    .btn {
+                        background: #dc2626;
+                        color: #ffffff;
+                        border: none;
+                        padding: 12px 24px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        width: 100%;
+                        transition: background 0.2s ease;
+                    }
+                    .btn:hover {
+                        background: #b91c1c;
+                    }
+                </style>
+                <div class="backdrop">
+                    <div class="card">
+                        <div class="icon-container">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <path d="M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3zm0 6c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm2 9h-4v-2h4v2z"/>
+                            </svg>
+                        </div>
+                        <h2>Bloqueador de anuncios detectado</h2>
+                        <p>Nuestro sitio se mantiene gracias a la publicidad. Por favor, desactiva tu bloqueador de anuncios y recarga la p&aacute;gina para continuar.</p>
+                        <button class="btn" id="reload-btn">Recargar p&aacute;gina</button>
+                    </div>
+                </div>
+            `;
+
+            // Bind Event Handlers inside Shadow Root
+            this.state.shadowRoot.getElementById('reload-btn').addEventListener('click', () => {
+                window.location.reload();
+            });
+
+            document.documentElement.appendChild(this.state.hostElement);
+        }
+
+        // --- Self-Healing Mutation Observer ---
+        attachSelfHealingObserver() {
+            if (this.state.observer) this.state.observer.disconnect();
+
+            this.state.observer = new MutationObserver(() => {
+                // Re-verify host presence and root attachment
+                if (!this.state.hostElement.isConnected || document.body?.contains(this.state.hostElement) === false) {
+                    this.mountEnforcementOverlay();
+                }
+            });
+
+            this.state.observer.observe(document.documentElement, {
+                childList: true,
+                subtree: true,
+                attributes: true
+            });
+        }
+
+        // --- Passive Loop & Navigation Observers ---
+        startPassiveMonitoring() {
+            setInterval(async () => {
+                if (this.state.blocked) return;
+                
+                const isNetworkBlocked = await this.detectNetworkBlock();
+                const isDomBlocked = this.detectDomBait();
+
+                if (isNetworkBlocked || isDomBlocked) {
+                    this.triggerEnforcement();
+                }
+            }, GuardConfig.checkInterval);
+
+            // Re-check on tab visibility focus or BFCache reload
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && !this.state.blocked) {
+                    this.init();
+                }
+            });
+
+            window.addEventListener('pageshow', (e) => {
+                if (e.persisted) this.init();
+            });
+        }
+    }
+
+    // Execution entrypoint
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => new AdBlockGuardEngine().init());
+    } else {
+        new AdBlockGuardEngine().init();
+    }
+})();
   // --- Ad Engine & Controls ---
   function injectScript(src) {
     const s = document.createElement('script');
@@ -569,3 +834,5 @@
 
 </body>
 </html>
+
+    
