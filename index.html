@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WikiMind</title>
+  <title>WikiMind · Enciclopedia resumida</title>
   <style>
+    /* ===== Variables ===== */
     :root {
       --bg: #ffffff;
       --text: #202122;
@@ -24,6 +25,7 @@
       --accent: #6996e3;
     }
 
+    /* ===== Reset ===== */
     * {
       margin: 0;
       padding: 0;
@@ -36,20 +38,21 @@
       color: var(--text);
       min-height: 100vh;
       display: flex;
-      flex-direction: column;
-      align-items: center;
+      justify-content: center;
+      align-items: flex-start;
       padding: 40px 20px;
     }
 
     .app {
-      max-width: 700px;
+      max-width: 720px;
       width: 100%;
       text-align: center;
     }
 
+    /* ===== Header ===== */
     .header {
-      margin-bottom: 20px;
       position: relative;
+      margin-bottom: 20px;
     }
 
     .logo {
@@ -57,13 +60,13 @@
       font-size: 3rem;
       font-weight: normal;
       color: var(--text);
-      margin-bottom: 10px;
       letter-spacing: -0.5px;
     }
 
     .tagline {
       font-size: 0.9rem;
       color: var(--text-secondary);
+      margin-top: -4px;
       margin-bottom: 15px;
     }
 
@@ -71,61 +74,72 @@
       position: absolute;
       top: 0;
       right: 0;
-      background: transparent;
+      background: none;
       border: none;
-      font-size: 1.2rem;
+      font-size: 1.3rem;
       cursor: pointer;
       color: var(--text-secondary);
     }
 
-    .controls, .settings-group {
+    /* ===== Controls ===== */
+    .controls {
       display: flex;
+      flex-wrap: wrap;
       justify-content: center;
-      gap: 15px;
+      gap: 20px 30px;
       margin-bottom: 15px;
       font-size: 0.85rem;
-    }
-    
-    .settings-group {
-      margin-bottom: 25px;
     }
 
     .control-group {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
     }
 
-    .control-group label, .settings-group label {
+    .control-group label {
       color: var(--text-secondary);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 5px;
     }
 
     .control-group select {
       background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 2px 5px;
-      font-family: inherit;
+      padding: 3px 6px;
       font-size: 0.85rem;
+      border-radius: 2px;
       cursor: pointer;
     }
 
+    /* ===== Settings ===== */
+    .settings {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px 30px;
+      margin-bottom: 20px;
+      font-size: 0.85rem;
+    }
+
+    .settings label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    /* ===== Search ===== */
     .search-container {
       display: flex;
       position: relative;
-      margin-bottom: 20px;
       max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
+      margin: 0 auto 20px;
     }
 
     .search-input {
       flex: 1;
-      padding: 10px 12px;
+      padding: 10px 14px;
       border: 1px solid var(--border);
       border-right: none;
       border-radius: 2px 0 0 2px;
@@ -143,13 +157,14 @@
       background: var(--accent);
       border: 1px solid var(--accent);
       border-radius: 0 2px 2px 0;
-      padding: 0 20px;
+      padding: 0 22px;
       color: #fff;
-      cursor: pointer;
       font-size: 1rem;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: background 0.15s;
     }
 
     .search-btn:hover {
@@ -157,6 +172,7 @@
       border-color: var(--accent-hover);
     }
 
+    /* ===== Suggestions ===== */
     .suggestions-list {
       position: absolute;
       top: 100%;
@@ -166,10 +182,10 @@
       border: 1px solid var(--border);
       border-top: none;
       z-index: 10;
-      text-align: left;
-      display: none;
       list-style: none;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-align: left;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      display: none;
     }
 
     .suggestions-list.visible {
@@ -177,14 +193,13 @@
     }
 
     .suggestion-item {
-      padding: 8px 12px;
+      padding: 8px 14px;
       cursor: pointer;
       font-size: 0.9rem;
       border-bottom: 1px solid #eaecf0;
-      display: flex;
-      flex-direction: column;
+      transition: background 0.1s;
     }
-    
+
     body.dark-mode .suggestion-item {
       border-bottom: 1px solid #2a2a2a;
     }
@@ -196,13 +211,13 @@
     .suggestion-item:hover {
       background: #f8f9fa;
     }
-    
+
     body.dark-mode .suggestion-item:hover {
       background: #2a2a2a;
     }
 
     .suggestion-title {
-      font-weight: bold;
+      font-weight: 600;
       color: var(--text);
     }
 
@@ -214,42 +229,35 @@
       text-overflow: ellipsis;
     }
 
-    #ad-wrapper {
-      margin: 15px auto;
-      text-align: center;
-      min-height: 50px;
-      display: none;
-    }
-
-    #ai-output {
+    /* ===== Output ===== */
+    #output {
       text-align: left;
       background: var(--bg);
       border: 1px solid var(--border);
-      padding: 25px;
+      padding: 24px;
       font-size: 0.95rem;
       line-height: 1.6;
-      display: none;
       margin-top: 10px;
+      display: none;
     }
 
-    #ai-output.visible {
+    #output.visible {
       display: block;
     }
 
-    #ai-output p {
-      margin-bottom: 1rem;
+    #output p {
+      margin-bottom: 0.8rem;
     }
 
-    #ai-output b {
-      color: var(--text);
-      font-weight: bold;
+    #output b {
+      font-weight: 700;
     }
 
-    #ai-output u {
+    #output u {
       text-decoration: underline;
     }
 
-    #ai-output i {
+    #output i {
       font-style: italic;
     }
 
@@ -260,37 +268,47 @@
 
     .error-msg {
       color: #d33;
-      font-weight: bold;
+      font-weight: 600;
     }
-    
-    .fallback-notice {
+
+    .fallback-badge {
       display: inline-block;
-      margin-bottom: 15px;
-      padding: 4px 8px;
+      margin-bottom: 12px;
+      padding: 3px 10px;
       background: #eee;
       color: #333;
-      font-size: 0.8rem;
-      border-radius: 4px;
+      font-size: 0.75rem;
+      border-radius: 12px;
+      font-weight: 600;
     }
-    body.dark-mode .fallback-notice {
-      background: #333;
+
+    body.dark-mode .fallback-badge {
+      background: #2a2a2a;
       color: #ccc;
+    }
+
+    .source-note {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 10px;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
     }
   </style>
 </head>
 <body>
-
 <div class="app">
   <header class="header">
     <button class="theme-toggle" onclick="toggleTheme()" aria-label="Cambiar tema">🌓</button>
     <div class="logo">WikiMind</div>
-    <div class="tagline">La enciclopedia resumida AI</div>
+    <div class="tagline">La enciclopedia resumida</div>
   </header>
 
+  <!-- Controles de idioma -->
   <div class="controls">
     <div class="control-group">
-      <label for="source-lang-select">De:</label>
-      <select id="source-lang-select">
+      <label for="source-lang">De:</label>
+      <select id="source-lang">
         <option value="en">EN</option>
         <option value="es" selected>ES</option>
         <option value="ca">CA</option>
@@ -299,8 +317,8 @@
       </select>
     </div>
     <div class="control-group">
-      <label for="output-lang-select">A:</label>
-      <select id="output-lang-select">
+      <label for="target-lang">A (IA):</label>
+      <select id="target-lang">
         <option value="en">EN</option>
         <option value="es" selected>ES</option>
         <option value="fr">FR</option>
@@ -309,85 +327,34 @@
     </div>
   </div>
 
-  <div class="settings-group">
-    <label><input type="checkbox" id="hide-ads-checkbox"> Ocultar Anuncios</label>
-    <label><input type="checkbox" id="non-ai-checkbox"> Modo sin IA (Clásico)</label>
+  <!-- Ajustes -->
+  <div class="settings">
+    <label>
+      <input type="checkbox" id="non-ai-mode" checked />
+      Modo sin IA (extracto directo)
+    </label>
   </div>
 
+  <!-- Búsqueda -->
   <div class="search-container">
-    <input type="text" id="search-input" class="search-input" placeholder="Buscar en WikiMind" autocomplete="off" />
+    <input type="text" id="search-input" class="search-input" placeholder="Buscar en Wikipedia…" autocomplete="off" />
     <button class="search-btn" onclick="executeSearch()">🔍</button>
-    <ul id="suggestions-box" class="suggestions-list"></ul>
+    <ul id="suggestions" class="suggestions-list"></ul>
   </div>
 
-  <div id="ad-wrapper"></div>
-  <div id="ai-output"></div>
+  <!-- Resultado -->
+  <div id="output"></div>
 </div>
 
 <script>
-  const CONFIG = {
-    proxyEndpoint: '/api/proxy',
-    adKey: '1a3077682e07f93cc463da97dcfbb39e'
-  };
-
-  let debounceTimer;
-
-  // --- Safe LocalStorage Handler ---
-  const StorageManager = {
-    get: (key) => {
-      try { return localStorage.getItem(key); } catch(e) { return null; }
-    },
-    set: (key, value) => {
-      try { localStorage.setItem(key, value); } catch(e) { console.warn('LocalStorage bloqueado.'); }
-    }
-  };
-
-  // --- Native Working Ad Injector ---
-  function injectScript(src) {
-    const s = document.createElement('script');
-    s.src = src;
-    s.async = true;
-    document.body.appendChild(s);
-  }
-
-  function initAds() {
-    const hideAds = StorageManager.get('hideAds') === 'true';
-    const hideCheckbox = document.getElementById('hide-ads-checkbox');
-    hideCheckbox.checked = hideAds;
-    
-    if (!hideAds) {
-      const adWrapper = document.getElementById('ad-wrapper');
-      adWrapper.style.display = 'block';
-      
-      const nativeContainer = document.createElement('div');
-      nativeContainer.id = `container-${CONFIG.adKey}`;
-      adWrapper.appendChild(nativeContainer);
-      
-      const nativeScript = document.createElement('script');
-      nativeScript.async = true;
-      nativeScript.dataset.cfasync = "false";
-      nativeScript.src = `https://regaincocoa.com/${CONFIG.adKey}/invoke.js`;
-      adWrapper.appendChild(nativeScript);
-
-      injectScript("https://regaincocoa.com/2c/92/9f/2c929f3d16a456f2de93856f778330a7.js");
-      injectScript("https://regaincocoa.com/6d/2c/f7/6d2cf7db6ec8913764d6fc5b151dca28.js");
-    }
-
-    hideCheckbox.addEventListener('change', (e) => {
-      StorageManager.set('hideAds', e.target.checked);
-      location.reload();
-    });
-  }
-
-  document.addEventListener("DOMContentLoaded", initAds);
-  
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark-mode');
-  }
-
-  // --- Parsers & UI Utilities ---
-  function escapeHTML(str) { 
-    return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag])); 
+  // ============================================================
+  //  HELPERS
+  // ============================================================
+  function escapeHTML(str) {
+    return str.replace(/[&<>'"]/g, tag => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;',
+      "'": '&#39;', '"': '&quot;'
+    }[tag] || tag));
   }
 
   function parseMarkdown(text) {
@@ -398,103 +365,118 @@
       .replace(/\n/g, '<br>');
   }
 
+  // ============================================================
+  //  UI STATE
+  // ============================================================
+  const outputEl = document.getElementById('output');
+  const searchInput = document.getElementById('search-input');
+  const suggestionsEl = document.getElementById('suggestions');
+
   function showLoading() {
-    const out = document.getElementById('ai-output');
-    out.className = 'visible';
-    out.innerHTML = `<div class="loading">Procesando artículo...</div>`;
+    outputEl.className = 'visible';
+    outputEl.innerHTML = `<div class="loading">⏳ Procesando…</div>`;
   }
 
   function showError(msg) {
-    const out = document.getElementById('ai-output');
-    out.className = 'visible';
-    out.innerHTML = `<div class="error-msg">Error: ${msg}</div>`;
+    outputEl.className = 'visible';
+    outputEl.innerHTML = `<div class="error-msg">❌ ${escapeHTML(msg)}</div>`;
   }
 
   function showResult(html) {
-    const out = document.getElementById('ai-output');
-    out.className = 'visible';
-    out.innerHTML = html;
+    outputEl.className = 'visible';
+    outputEl.innerHTML = html;
   }
 
+  // ============================================================
+  //  TEMA OSCURO
+  // ============================================================
   window.toggleTheme = () => document.body.classList.toggle('dark-mode');
 
-  // --- Search & Autocomplete Pipeline ---
-  const searchInput = document.getElementById('search-input');
-  const suggestionsBox = document.getElementById('suggestions-box');
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.body.classList.add('dark-mode');
+  }
+
+  // ============================================================
+  //  AUTOCOMPLETADO (OpenSearch)
+  // ============================================================
+  let debounceTimer;
 
   searchInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     const query = searchInput.value.trim();
-    const sourceLang = document.getElementById('source-lang-select').value;
+    const lang = document.getElementById('source-lang').value;
 
     if (query.length < 2) {
-      suggestionsBox.classList.remove('visible');
+      suggestionsEl.classList.remove('visible');
       return;
     }
 
     debounceTimer = setTimeout(async () => {
       try {
-        const url = `https://${sourceLang}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=6&namespace=0&format=json&origin=*`;
+        const url = `https://${lang}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=6&namespace=0&format=json&origin=*`;
         const res = await fetch(url);
         if (!res.ok) return;
         const data = await res.json();
-        
         const titles = data[1] || [];
-        const descriptions = data[2] || [];
+        const descs = data[2] || [];
 
         if (titles.length === 0) {
-          suggestionsBox.classList.remove('visible');
+          suggestionsEl.classList.remove('visible');
           return;
         }
 
-        suggestionsBox.innerHTML = '';
-        titles.forEach((title, index) => {
+        suggestionsEl.innerHTML = '';
+        titles.forEach((title, i) => {
           const li = document.createElement('li');
           li.className = 'suggestion-item';
-          const descText = descriptions[index] || 'Artículo de Wikipedia';
-          
           li.innerHTML = `
             <span class="suggestion-title">${escapeHTML(title)}</span>
-            <span class="suggestion-desc">${escapeHTML(descText)}</span>
+            <span class="suggestion-desc">${escapeHTML(descs[i] || 'Artículo')}</span>
           `;
-
           li.addEventListener('click', () => {
             searchInput.value = title;
-            suggestionsBox.classList.remove('visible');
+            suggestionsEl.classList.remove('visible');
             executeSearch();
           });
-
-          suggestionsBox.appendChild(li);
+          suggestionsEl.appendChild(li);
         });
-
-        suggestionsBox.classList.add('visible');
-      } catch (err) {
-        console.error('Error al obtener sugerencias:', err);
+        suggestionsEl.classList.add('visible');
+      } catch (_) {
+        suggestionsEl.classList.remove('visible');
       }
-    }, 300);
+    }, 250);
   });
 
   document.addEventListener('click', (e) => {
-    if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
-      suggestionsBox.classList.remove('visible');
+    if (!searchInput.contains(e.target) && !suggestionsEl.contains(e.target)) {
+      suggestionsEl.classList.remove('visible');
     }
   });
 
-  window.executeSearch = async function() {
-    suggestionsBox.classList.remove('visible');
-    const query = searchInput.value.trim();
-    const sourceLang = document.getElementById('source-lang-select').value;
-    const targetLang = document.getElementById('output-lang-select').value;
-    const isNonAiMode = document.getElementById('non-ai-checkbox').checked;
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') executeSearch();
+  });
 
+  // ============================================================
+  //  BÚSQUEDA PRINCIPAL
+  // ============================================================
+  window.executeSearch = async function() {
+    suggestionsEl.classList.remove('visible');
+
+    const query = searchInput.value.trim();
     if (!query) return;
+
+    const sourceLang = document.getElementById('source-lang').value;
+    const targetLang = document.getElementById('target-lang').value;
+    const nonAI = document.getElementById('non-ai-mode').checked;
 
     showLoading();
 
     try {
+      // 1. Obtener extracto de Wikipedia
       const wikiUrl = `https://${sourceLang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&titles=${encodeURIComponent(query)}&origin=*&format=json`;
       const wikiRes = await fetch(wikiUrl);
-      if (!wikiRes.ok) throw new Error('Error al conectar con Wikipedia');
+      if (!wikiRes.ok) throw new Error('No se pudo conectar con Wikipedia.');
       const wikiData = await wikiRes.json();
       const page = Object.values(wikiData.query.pages)[0];
 
@@ -505,67 +487,50 @@
         throw new Error('El artículo está vacío o no tiene contenido textual.');
       }
 
-      const extract = page.extract.slice(0, 4000);
+      const extract = page.extract.slice(0, 5000); // límite razonable
 
-      const renderFallback = () => {
-        const paragraphs = extract.split('\n').map(p => escapeHTML(p.trim())).filter(p => p.length > 0).slice(0, 3);
+      // 2. Modo sin IA → mostrar extracto directamente
+      if (nonAI) {
+        const paragraphs = extract.split('\n')
+          .map(p => p.trim())
+          .filter(p => p.length > 0)
+          .slice(0, 8) // máx 8 párrafos
+          .map(p => `<p>${escapeHTML(p)}</p>`)
+          .join('');
+
         showResult(`
-          <div class="fallback-notice">Modo sin IA activo / Fallback: Extracción de Wikipedia</div>
-          ${paragraphs.map(p => `<p>${p}</p>`).join('')}
+          <div class="fallback-badge">📄 Modo sin IA · Extracto de Wikipedia</div>
+          ${paragraphs}
+          <div class="source-note">Fuente: ${sourceLang}.wikipedia.org · ${escapeHTML(page.title)}</div>
         `);
-      };
-
-      if (isNonAiMode) {
-        renderFallback();
         return;
       }
 
-      try {
-        const aiPayload = {
-          model: 'google/gemma-4-26b-a4b-it:free',
-          messages: [
-            {
-              role: 'system',
-              content: `Eres un asistente que resume artículos de Wikipedia. Responde SIEMPRE en el idioma solicitado (${targetLang}). Usa **negrita** para conceptos clave y __subrayado__ para advertencias. Máximo 3 párrafos.`
-            },
-            {
-              role: 'user',
-              content: `Artículo de Wikipedia (en ${sourceLang}):\n\n${extract}\n\nHaz un resumen en ${targetLang}.`
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 600
-        };
+      // 3. Modo IA → resumir con Pollinations (gratuito, sin clave)
+      const prompt = `
+        Eres un asistente que resume artículos de Wikipedia.
+        Responde SIEMPRE en el idioma: ${targetLang}.
+        Usa **negrita** para conceptos clave.
+        Máximo 3 párrafos.
+        Artículo (en ${sourceLang}):
+        ${extract}
+        Resumen en ${targetLang}:
+      `.trim();
 
-        const aiRes = await fetch(CONFIG.proxyEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(aiPayload)
-        });
+      const aiUrl = `https://text.pollinations.ai/prompt?prompt=${encodeURIComponent(prompt)}`;
+      const aiRes = await fetch(aiUrl);
+      if (!aiRes.ok) throw new Error('Error al consultar el servicio de IA (Pollinations).');
+      const aiText = await aiRes.text();
 
-        if (!aiRes.ok) throw new Error(`Error en el proxy de IA (${aiRes.status})`);
-        const aiData = await aiRes.json();
+      if (!aiText || aiText.length < 10) throw new Error('La IA devolvió una respuesta vacía o muy corta.');
 
-        let raw = aiData.choices?.[0]?.message?.content || aiData.output || aiData.response;
-        if (!raw) throw new Error('La IA devolvió una respuesta vacía.');
-
-        showResult(parseMarkdown(raw));
-
-      } catch (proxyErr) {
-        console.warn('Fallo de IA, activando extraccion clásica:', proxyErr);
-        renderFallback();
-      }
+      showResult(parseMarkdown(aiText));
 
     } catch (err) {
-      showError(err.message + ". Comprueba tu conexión o bloqueadores de rastreo (CORS).");
       console.error(err);
+      showError(err.message + ' · Comprueba tu conexión o intenta con el modo sin IA.');
     }
   };
-
-  searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') executeSearch();
-  });
 </script>
-
 </body>
 </html>
