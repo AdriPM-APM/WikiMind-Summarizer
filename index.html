@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WikiMind · Enciclopedia con IA</title>
+  <title>WikiMind · Enciclopedia Inteligente</title>
   <style>
     :root {
       --bg: #ffffff;
@@ -32,12 +32,8 @@
       padding: 30px 15px;
       min-height: 100vh;
     }
-    .app {
-      max-width: 720px;
-      width: 100%;
-      text-align: center;
-    }
-    .header { position: relative; margin-bottom:20px; }
+    .app { max-width:720px; width:100%; text-align:center; }
+    .header { position:relative; margin-bottom:20px; }
     .logo { font-family:var(--font-serif); font-size:2.8rem; font-weight:normal; }
     .tagline { font-size:0.9rem; color:var(--text-secondary); margin-top:-4px; }
     .theme-toggle {
@@ -49,9 +45,7 @@
       display:flex; flex-wrap:wrap; justify-content:center;
       gap:15px 25px; margin-bottom:12px; font-size:0.85rem;
     }
-    .control-group {
-      display:flex; align-items:center; gap:6px;
-    }
+    .control-group { display:flex; align-items:center; gap:6px; }
     .control-group label { color:var(--text-secondary); }
     .control-group select {
       background:var(--bg); border:1px solid var(--border); color:var(--text);
@@ -94,7 +88,7 @@
       display:flex; align-items:center; justify-content:center;
       transition:background 0.15s;
     }
-    .search-btn:hover { background:var(--accent-hover); border-color:var(--accent-hover); }
+    .search-btn:hover { background:var(--accent-hover); }
     .suggestions-list {
       position:absolute; top:100%; left:0; right:54px;
       background:var(--bg); border:1px solid var(--border); border-top:none;
@@ -236,10 +230,10 @@
   };
 
   // ============================================================
-  //  ANUNCIOS
+  //  ANUNCIOS - CON INYECCIÓN ROBUSTA
   // ============================================================
   function loadAds() {
-    const hideAds = Storage.get('hideAds') !== 'false';
+    const hideAds = Storage.get('hideAds') !== 'false'; // true = ocultos
     const checkbox = document.getElementById('hide-ads');
     checkbox.checked = hideAds;
     const wrapper = document.getElementById('ad-wrapper');
@@ -267,7 +261,7 @@
 
     checkbox.addEventListener('change', function() {
       Storage.set('hideAds', String(this.checked));
-      location.reload();
+      location.reload(); // recarga para limpiar scripts
     });
   }
 
@@ -363,30 +357,50 @@
   });
 
   // ============================================================
-  //  FUNCIONES DE RESUMEN
+  //  RESUMEN LOCAL INTELIGENTE (extracción de oraciones clave)
   // ============================================================
-  function localSummarize(text, targetLang) {
-    log('Generando resumen local');
-    const paragraphs = text.split('\n').map(p => p.trim()).filter(p => p.length > 20);
-    let summary = paragraphs.slice(0, 3).join('\n\n');
-    if (summary.length > 2500) summary = summary.slice(0, 2500) + '…';
-    const lines = summary.split('\n').map(line => {
-      const words = line.split(' ');
-      for (let i = 0; i < words.length; i++) {
-        const w = words[i];
-        if (w.length > 2 && /^[A-ZÁÉÍÓÚÑ]/.test(w) && !/^[A-ZÁÉÍÓÚÑ]{2,}$/.test(w)) {
-          words[i] = `**${w}**`;
-          break;
-        }
-      }
-      return words.join(' ');
+  function localSummarize(text, targetLang, maxSentences = 5) {
+    log('Generando resumen local inteligente...');
+    // Dividir en oraciones (simple)
+    const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 20);
+    if (sentences.length === 0) return '<p>No hay suficientes oraciones para resumir.</p>';
+
+    // Calcular frecuencia de palabras (excluyendo stopwords básicas)
+    const stopwords = new Set(['el','la','los','las','de','del','en','y','a','que','un','una','por','con','para','sin','sobre','entre','tras','durante','mediante','según','hasta','desde','cuando','donde','mientras','aunque','porque','como','cual','cuyo','quien','donde','cuanto']);
+    const wordFreq = {};
+    sentences.forEach(s => {
+      const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
+      words.forEach(w => wordFreq[w] = (wordFreq[w] || 0) + 1);
     });
-    summary = lines.join('\n');
-    return `<div class="badge">🧠 Resumen local (${targetLang.toUpperCase()})</div>${parseMarkdown(summary)}`;
+
+    // Puntuar oraciones por suma de frecuencias de palabras
+    const scored = sentences.map(s => {
+      const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
+      let score = words.reduce((sum, w) => sum + (wordFreq[w] || 0), 0);
+      // Bonus por posición (primeras oraciones más relevantes)
+      const posBonus = Math.max(0, 1 - (sentences.indexOf(s) / sentences.length) * 0.5);
+      score *= (1 + posBonus);
+      return { sentence: s, score };
+    });
+
+    // Ordenar por puntuación y seleccionar las mejores
+    scored.sort((a,b) => b.score - a.score);
+    const top = scored.slice(0, maxSentences).map(item => item.sentence);
+
+    // Reordenar según aparición en el texto original
+    const ordered = sentences.filter(s => top.includes(s));
+
+    // Formatear
+    const summary = ordered.map(s => `<p>${escapeHTML(s)}.</p>`).join('');
+    const label = `🧠 Resumen local inteligente (${targetLang.toUpperCase()})`;
+    return `<div class="badge">${label}</div>${summary}`;
   }
 
-  async function aiSummarize(text, sourceLang, targetLang) {
-    log('Solicitando resumen IA...');
+  // ============================================================
+  //  IA CON POLLINATIONS + TIMEOUT + REINTENTOS
+  // ============================================================
+  async function aiSummarize(text, sourceLang, targetLang, retries = 2) {
+    log('Solicitando resumen IA (Pollinations)...');
     const prompt = `
       Resume el siguiente artículo de Wikipedia en ${targetLang.toUpperCase()}.
       Usa **negrita** para conceptos clave.
@@ -397,12 +411,28 @@
     `.trim();
 
     const url = `https://text.pollinations.ai/prompt?prompt=${encodeURIComponent(prompt)}`;
-    const response = await fetch(url, { method: 'GET', headers: { 'Accept': 'text/plain' } });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const result = await response.text();
-    if (!result || result.length < 10) throw new Error('Respuesta vacía o muy corta');
-    log('IA respondió correctamente');
-    return result;
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000); // 15 segundos timeout
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Accept': 'text/plain' },
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const result = await response.text();
+        if (!result || result.length < 10) throw new Error('Respuesta vacía o muy corta');
+        log('IA respondió correctamente en intento ' + attempt);
+        return result;
+      } catch (err) {
+        log(`Intento ${attempt} falló: ${err.message}`);
+        if (attempt === retries) throw err;
+        await new Promise(resolve => setTimeout(resolve, 1000)); // esperar 1s antes de reintentar
+      }
+    }
   }
 
   // ============================================================
@@ -466,36 +496,4 @@
           log('Fallo IA: ' + aiErr.message + ' → usando local');
           const fallback = localSummarize(extract, targetLang);
           resultHtml = `
-            <div class="badge" style="background:#f9e0d0;color:#7a3a1a;">⚠️ IA falló, mostrando resumen local</div>
-            ${fallback}
-          `;
-        }
-      } else {
-        throw new Error('Modo desconocido');
-      }
-
-      resultHtml += `<div class="source-note">Fuente: ${sourceLang}.wikipedia.org · ${escapeHTML(page.title)}</div>`;
-      showResult(resultHtml);
-
-    } catch (err) {
-      log('ERROR: ' + err.message);
-      showError(err.message + ' · Intenta con otro modo.', executeSearch);
-    }
-  }
-
-  window.executeSearch = executeSearch;
-
-  // ============================================================
-  //  INICIALIZACIÓN
-  // ============================================================
-  document.addEventListener('DOMContentLoaded', function() {
-    log('DOM cargado, inicializando...');
-    loadAds();
-    document.querySelector('input[name="summary-mode"][value="extract"]').checked = true;
-    log('Inicialización completa');
-  });
-
-  searchBtn.addEventListener('click', executeSearch);
-</script>
-</body>
-</html>
+            <div class="badge" style="background:#f9e0
