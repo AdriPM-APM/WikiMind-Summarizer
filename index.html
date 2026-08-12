@@ -229,6 +229,26 @@
       text-overflow: ellipsis;
     }
 
+    /* ===== Ad Container ===== */
+    #ad-wrapper {
+      margin: 15px auto 20px;
+      text-align: center;
+      min-height: 60px;
+      display: none; /* oculto por defecto */
+    }
+
+    #ad-wrapper.active {
+      display: block;
+    }
+
+    #ad-wrapper > div {
+      display: inline-block;
+      background: var(--bg);
+      border-radius: 6px;
+      padding: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+
     /* ===== Output ===== */
     #output {
       text-align: left;
@@ -330,6 +350,10 @@
   <!-- Ajustes -->
   <div class="settings">
     <label>
+      <input type="checkbox" id="hide-ads" checked />
+      Ocultar anuncios
+    </label>
+    <label>
       <input type="checkbox" id="non-ai-mode" checked />
       Modo sin IA (extracto directo)
     </label>
@@ -340,6 +364,11 @@
     <input type="text" id="search-input" class="search-input" placeholder="Buscar en Wikipedia…" autocomplete="off" />
     <button class="search-btn" onclick="executeSearch()">🔍</button>
     <ul id="suggestions" class="suggestions-list"></ul>
+  </div>
+
+  <!-- Contenedor de anuncios (banner nativo) -->
+  <div id="ad-wrapper">
+    <!-- Aquí se inyectará el div del banner cuando los anuncios estén activos -->
   </div>
 
   <!-- Resultado -->
@@ -363,6 +392,65 @@
       .replace(/__(.*?)__/g, '<u>$1</u>')
       .replace(/\*(.*?)\*/g, '<i>$1</i>')
       .replace(/\n/g, '<br>');
+  }
+
+  // ============================================================
+  //  LOCAL STORAGE (preferencias)
+  // ============================================================
+  const StorageManager = {
+    get(key) {
+      try { return localStorage.getItem(key); } catch (_) { return null; }
+    },
+    set(key, value) {
+      try { localStorage.setItem(key, value); } catch (_) {}
+    }
+  };
+
+  // ============================================================
+  //  ANUNCIOS
+  // ============================================================
+  function loadAds() {
+    const hideAds = StorageManager.get('hideAds') !== 'true'; // por defecto true (ocultos)
+    const checkbox = document.getElementById('hide-ads');
+    checkbox.checked = hideAds;
+
+    const adWrapper = document.getElementById('ad-wrapper');
+
+    function activateAds() {
+      // Mostrar el contenedor
+      adWrapper.classList.add('active');
+
+      // 1. Crear el div para el banner nativo
+      const bannerDiv = document.createElement('div');
+      bannerDiv.id = 'container-1a3077682e07f93cc463da97dcfbb39e';
+      adWrapper.appendChild(bannerDiv);
+
+      // 2. Cargar el script del banner (invoke.js)
+      const bannerScript = document.createElement('script');
+      bannerScript.async = true;
+      bannerScript.dataset.cfasync = 'false';
+      bannerScript.src = 'https://regaincocoa.com/1a3077682e07f93cc463da97dcfbb39e/invoke.js';
+      adWrapper.appendChild(bannerScript);
+
+      // 3. Cargar el popunder (se ejecuta solo al añadirlo)
+      const popunderScript = document.createElement('script');
+      popunderScript.src = 'https://regaincocoa.com/6d/2c/f7/6d2cf7db6ec8913764d6fc5b151dca28.js';
+      popunderScript.async = true;
+      document.body.appendChild(popunderScript);
+    }
+
+    // Si el usuario NO quiere ocultar anuncios → mostrarlos
+    if (!hideAds) {
+      activateAds();
+    }
+
+    // Manejar cambio en el checkbox
+    checkbox.addEventListener('change', function () {
+      const newState = this.checked; // true = ocultar, false = mostrar
+      StorageManager.set('hideAds', String(newState));
+      // Recargar para aplicar cambios (los scripts se añaden o no)
+      location.reload();
+    });
   }
 
   // ============================================================
@@ -487,14 +575,14 @@
         throw new Error('El artículo está vacío o no tiene contenido textual.');
       }
 
-      const extract = page.extract.slice(0, 5000); // límite razonable
+      const extract = page.extract.slice(0, 5000);
 
       // 2. Modo sin IA → mostrar extracto directamente
       if (nonAI) {
         const paragraphs = extract.split('\n')
           .map(p => p.trim())
           .filter(p => p.length > 0)
-          .slice(0, 8) // máx 8 párrafos
+          .slice(0, 8)
           .map(p => `<p>${escapeHTML(p)}</p>`)
           .join('');
 
@@ -531,6 +619,14 @@
       showError(err.message + ' · Comprueba tu conexión o intenta con el modo sin IA.');
     }
   };
+
+  // ============================================================
+  //  INICIALIZACIÓN
+  // ============================================================
+  document.addEventListener('DOMContentLoaded', () => {
+    // Cargar estado de los anuncios (y activarlos si corresponde)
+    loadAds();
+  });
 </script>
 </body>
-</html>
+      </html>
