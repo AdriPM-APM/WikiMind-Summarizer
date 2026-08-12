@@ -410,7 +410,7 @@
   //  ANUNCIOS
   // ============================================================
   function loadAds() {
-    const hideAds = StorageManager.get('hideAds') !== 'true'; // por defecto true (ocultos)
+    const hideAds = StorageManager.get('hideAds') !== 'false'; // por defecto true (ocultos)
     const checkbox = document.getElementById('hide-ads');
     checkbox.checked = hideAds;
 
