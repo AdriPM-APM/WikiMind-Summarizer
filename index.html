@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WikiMind · Enciclopedia Inteligente</title>
+  <title>WikiMind · Resumen Inteligente</title>
   <style>
     :root {
       --bg: #ffffff;
@@ -67,9 +67,6 @@
     .mode-selector input[type="radio"] { accent-color:var(--accent); }
     .mode-selector label:has(input:checked) {
       border-color:var(--accent); background:var(--accent); color:#fff;
-    }
-    body.dark-mode .mode-selector label:has(input:checked) {
-      background:var(--accent); color:#fff;
     }
     .search-container {
       display:flex; position:relative; max-width:600px; margin:0 auto 20px;
@@ -150,7 +147,7 @@
   <header class="header">
     <button class="theme-toggle" onclick="toggleTheme()">🌓</button>
     <div class="logo">WikiMind</div>
-    <div class="tagline">Enciclopedia con resumen inteligente</div>
+    <div class="tagline">Resumen inteligente · con IA o local</div>
   </header>
 
   <div class="controls">
@@ -172,8 +169,8 @@
 
   <div class="mode-selector">
     <label><input type="radio" name="summary-mode" value="extract" checked /> 📄 Extracto</label>
-    <label><input type="radio" name="summary-mode" value="local" /> 🧠 Local</label>
-    <label><input type="radio" name="summary-mode" value="ai" /> 🤖 IA</label>
+    <label><input type="radio" name="summary-mode" value="local" /> 🧠 Local (TF-IDF)</label>
+    <label><input type="radio" name="summary-mode" value="ai" /> 🤖 IA (OpenRouter)</label>
   </div>
 
   <div class="settings">
@@ -230,17 +227,16 @@
   };
 
   // ============================================================
-  //  ANUNCIOS - CON INYECCIÓN ROBUSTA
+  //  ANUNCIOS
   // ============================================================
   function loadAds() {
-    const hideAds = Storage.get('hideAds') !== 'false'; // true = ocultos
+    const hideAds = Storage.get('hideAds') !== 'false';
     const checkbox = document.getElementById('hide-ads');
     checkbox.checked = hideAds;
     const wrapper = document.getElementById('ad-wrapper');
 
     function activate() {
       wrapper.classList.add('active');
-      // Banner nativo
       const div = document.createElement('div');
       div.id = 'container-1a3077682e07f93cc463da97dcfbb39e';
       wrapper.appendChild(div);
@@ -249,7 +245,6 @@
       script1.dataset.cfasync = 'false';
       script1.src = 'https://regaincocoa.com/1a3077682e07f93cc463da97dcfbb39e/invoke.js';
       wrapper.appendChild(script1);
-      // Popunder
       const script2 = document.createElement('script');
       script2.src = 'https://regaincocoa.com/6d/2c/f7/6d2cf7db6ec8913764d6fc5b151dca28.js';
       script2.async = true;
@@ -261,7 +256,7 @@
 
     checkbox.addEventListener('change', function() {
       Storage.set('hideAds', String(this.checked));
-      location.reload(); // recarga para limpiar scripts
+      location.reload();
     });
   }
 
@@ -357,50 +352,48 @@
   });
 
   // ============================================================
-  //  RESUMEN LOCAL INTELIGENTE (extracción de oraciones clave)
+  //  RESUMEN LOCAL AVANZADO (TF-IDF simplificado)
   // ============================================================
   function localSummarize(text, targetLang, maxSentences = 5) {
-    log('Generando resumen local inteligente...');
-    // Dividir en oraciones (simple)
+    log('Generando resumen local con TF-IDF...');
     const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 20);
     if (sentences.length === 0) return '<p>No hay suficientes oraciones para resumir.</p>';
 
-    // Calcular frecuencia de palabras (excluyendo stopwords básicas)
-    const stopwords = new Set(['el','la','los','las','de','del','en','y','a','que','un','una','por','con','para','sin','sobre','entre','tras','durante','mediante','según','hasta','desde','cuando','donde','mientras','aunque','porque','como','cual','cuyo','quien','donde','cuanto']);
+    const stopwords = new Set([
+      'el','la','los','las','un','una','unos','unas','de','del','en','y','a','que','por','para','con','sin','sobre',
+      'entre','tras','durante','mediante','según','hasta','desde','cuando','donde','mientras','aunque','porque','como',
+      'cual','cuyo','quien','donde','cuanto','muy','más','menos','tan','tanto','ni','o','u','sino','si','no','ya','bien'
+    ]);
+
     const wordFreq = {};
     sentences.forEach(s => {
       const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
       words.forEach(w => wordFreq[w] = (wordFreq[w] || 0) + 1);
     });
 
-    // Puntuar oraciones por suma de frecuencias de palabras
-    const scored = sentences.map(s => {
+    const scored = sentences.map((s, idx) => {
       const words = s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopwords.has(w));
       let score = words.reduce((sum, w) => sum + (wordFreq[w] || 0), 0);
-      // Bonus por posición (primeras oraciones más relevantes)
-      const posBonus = Math.max(0, 1 - (sentences.indexOf(s) / sentences.length) * 0.5);
-      score *= (1 + posBonus);
+      const posBonus = 1 + (1 - idx / sentences.length) * 0.5;
+      const lenBonus = Math.min(1.5, 0.5 + (s.length / 200));
+      score *= posBonus * lenBonus;
       return { sentence: s, score };
     });
 
-    // Ordenar por puntuación y seleccionar las mejores
     scored.sort((a,b) => b.score - a.score);
     const top = scored.slice(0, maxSentences).map(item => item.sentence);
-
-    // Reordenar según aparición en el texto original
     const ordered = sentences.filter(s => top.includes(s));
 
-    // Formatear
     const summary = ordered.map(s => `<p>${escapeHTML(s)}.</p>`).join('');
-    const label = `🧠 Resumen local inteligente (${targetLang.toUpperCase()})`;
+    const label = `🧠 Resumen local (${targetLang.toUpperCase()})`;
     return `<div class="badge">${label}</div>${summary}`;
   }
 
   // ============================================================
-  //  IA CON POLLINATIONS + TIMEOUT + REINTENTOS
+  //  IA CON PROXY /api/proxy (usa la clave de entorno en Vercel)
   // ============================================================
-  async function aiSummarize(text, sourceLang, targetLang, retries = 2) {
-    log('Solicitando resumen IA (Pollinations)...');
+  async function aiSummarize(text, sourceLang, targetLang) {
+    log('Solicitando resumen con IA a través del proxy...');
     const prompt = `
       Resume el siguiente artículo de Wikipedia en ${targetLang.toUpperCase()}.
       Usa **negrita** para conceptos clave.
@@ -410,29 +403,30 @@
       Resumen en ${targetLang.toUpperCase()}:
     `.trim();
 
-    const url = `https://text.pollinations.ai/prompt?prompt=${encodeURIComponent(prompt)}`;
+    const payload = {
+      model: 'google/gemma-2-9b-it:free',
+      messages: [
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 500
+    };
 
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000); // 15 segundos timeout
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: { 'Accept': 'text/plain' },
-          signal: controller.signal
-        });
-        clearTimeout(timeout);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const result = await response.text();
-        if (!result || result.length < 10) throw new Error('Respuesta vacía o muy corta');
-        log('IA respondió correctamente en intento ' + attempt);
-        return result;
-      } catch (err) {
-        log(`Intento ${attempt} falló: ${err.message}`);
-        if (attempt === retries) throw err;
-        await new Promise(resolve => setTimeout(resolve, 1000)); // esperar 1s antes de reintentar
-      }
+    const response = await fetch('/api/proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Proxy error (${response.status}): ${errorText}`);
     }
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content || content.length < 10) throw new Error('Respuesta vacía o muy corta');
+    log('Proxy respondió correctamente');
+    return content;
   }
 
   // ============================================================
@@ -487,6 +481,7 @@
         log('Modo extracto');
       } else if (mode === 'local') {
         resultHtml = localSummarize(extract, targetLang);
+        log('Modo local');
       } else if (mode === 'ai') {
         try {
           const aiText = await aiSummarize(extract, sourceLang, targetLang);
@@ -496,4 +491,26 @@
           log('Fallo IA: ' + aiErr.message + ' → usando local');
           const fallback = localSummarize(extract, targetLang);
           resultHtml = `
-            <div class="badge" style="background:#f9e0
+            <div class="badge" style="background:#f9e0d0;color:#7a3a1a;">⚠️ IA falló, mostrando resumen local</div>
+            ${fallback}
+          `;
+        }
+      } else {
+        throw new Error('Modo desconocido');
+      }
+
+      resultHtml += `<div class="source-note">Fuente: ${sourceLang}.wikipedia.org · ${escapeHTML(page.title)}</div>`;
+      showResult(resultHtml);
+
+    } catch (err) {
+      log('ERROR: ' + err.message);
+      showError(err.message + ' · Intenta con otro modo.', executeSearch);
+    }
+  }
+
+  window.executeSearch = executeSearch;
+
+  // ============================================================
+  //  INICIALIZACIÓN
+  // ============================================================
+  do
